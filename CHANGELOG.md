@@ -13,5 +13,6 @@ All notable changes are documented here. The format follows
 - `streetpano synth` command for test streets with exact ground truth
 - Automated tests, type checks, linting and CI
 - Design for downloading AI models on demand
+- Design for the user interface and workflow
 - `streetpano poses` command, which finds camera positions with COLMAP and can measure
   them against a synthetic street

@@ -8,7 +8,7 @@ flowchart LR
     M0[0. Foundations] --> M1[1. Test data]
     M1 --> M2[2. Classic baseline]
     M2 --> M3[3. Keep and remove]
-    M3 --> M4[4. Review tool]
+    M3 --> M4[4. User interface]
     M4 --> M5[5. Scale]
     M5 --> M6[6. Generative fill]
 ```
@@ -50,8 +50,11 @@ This tests the core idea, and the riskiest part of it, early.
 
 **Done when:** marked objects are never cut or doubled in the test street.
 
-## 4. Review tool
+## 4. User interface
 
+See the [planned workflow](concept/ui-workflow.md).
+
+- [ ] Projects, import and preview screens
 - [ ] Tile viewer
 - [ ] [Model manager](concept/ai-models.md#installing-models), including download, verification and licences
 - [ ] Click to mark objects, and review suggestions
