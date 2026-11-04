@@ -42,3 +42,7 @@ models/
 .idea/
 .vscode/
 .DS_Store
+
+# C++ builds
+build/
+CMakeUserPresets.json

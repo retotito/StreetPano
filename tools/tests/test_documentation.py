@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).parent.parent
+ROOT = Path(__file__).parents[2]
 SVG_FILES = sorted((ROOT / "docs" / "assets").glob("*.svg"))
 LINK = re.compile(r"\]\((?!https?://|#)([^)#]+)")
 

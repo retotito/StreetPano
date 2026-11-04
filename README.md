@@ -6,10 +6,8 @@
 Open-source software for building very long street panoramas from photos taken
 while walking along a street.
 
-> **Status: concept stage.** The design is documented, and the repository has
-> tests and CI, but the stitching pipeline does not exist yet. So far, only the
-> `streetpano estimate` planning command, the `streetpano synth` test-street generator
-> and `streetpano poses` for finding camera positions work.
+> **Status: early development.** The first window opens a folder and shows its photos,
+> and developer tools can find camera positions. The app can't stitch yet.
 
 ![Seams chosen by graph cut keep a car whole, while straight seams break it](docs/assets/seams.svg)
 
@@ -53,35 +51,39 @@ so these objects get cut or doubled.
 
 ## Quick start
 
-You need [uv](https://docs.astral.sh/uv/).
+On macOS, you need [Homebrew](https://brew.sh) and [uv](https://docs.astral.sh/uv/).
 
 ```sh
+brew install cmake ninja qtbase
 git clone https://github.com/retotito/StreetPano.git
 cd StreetPano
-uv sync
-uv run streetpano estimate --length 500 --spacing 1
+./scripts/dev.sh
 ```
 
-```text
-Photos:          500
-Facade detail:   3.75 mm/px
-Panorama:        133333 x 4000 px
-Uncompressed:    1.6 GB (8-bit), 3.2 GB (16-bit)
-Foreground shift: 533 px between neighbouring photos
+This builds the app and opens a synthetic street. To open your own photos:
+
+```sh
+./scripts/dev.sh ~/Pictures/my-street
 ```
+
+Use the left and right arrow keys to move along the street, the scroll wheel to zoom,
+and double-click to fit the photo to the window.
+
+## Developer tools
+
+```sh
+uv run --project tools streetpano estimate --length 500 --spacing 1
+uv run --project tools streetpano synth my-street --length 30
+```
+
+See [tools/README.md](tools/README.md).
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Run all checks with:
-
-```sh
-uv run pre-commit run --all-files
-uv run pytest
-uv run mkdocs build --strict
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licence
 
-StreetPano's code is licensed under the [Apache License 2.0](LICENSE). AI models
-are separate downloads with their own terms, and some are limited to
+StreetPano's code is licensed under the [Apache License 2.0](LICENSE). It uses Qt under
+the LGPL. AI models are separate downloads with their own terms, and some are limited to
 non-commercial use. See [AI models](docs/concept/ai-models.md).

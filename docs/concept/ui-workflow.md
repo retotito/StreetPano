@@ -1,7 +1,10 @@
 # User interface and workflow
 
-!!! note "Planned"
-    This describes the design. The app has no user interface yet.
+!!! note "Mostly planned"
+    A first window exists, which opens a folder and shows its photos. The rest of this
+    page describes the planned design.
+
+![The first window, showing a photo above a film strip](../assets/first-window.png)
 
 ## Workflow
 
@@ -115,27 +118,24 @@ Export can also save the mask of generated pixels and a list of the decisions ma
 
 ## Stack
 
-See the [decision record](../adr/0009-web-ui-stack.md).
+See the [decision record](../adr/0010-cpp-and-qt.md).
 
 ```mermaid
 flowchart LR
-    subgraph Browser[Browser, or Tauri window later]
-        UI[Svelte and TypeScript]
-        OSD[OpenSeadragon]
-        CV[Canvas overlay for drawing]
-    end
-    subgraph Local[Python on the same computer]
-        API[FastAPI]
+    subgraph App[StreetPano app, C++]
+        UI[Qt screens]
+        View[GPU panorama view]
         Jobs[Job queue]
-        Core[StreetPano pipeline]
+        Core[Pipeline]
     end
+    Colmap[COLMAP]
+    Ai[AI models through ONNX Runtime]
     Disk[(Project folder)]
-    UI -- HTTP --> API
-    OSD -- tiles --> API
-    API -- progress over WebSocket --> UI
-    API --> Jobs --> Core --> Disk
-    API --> Disk
+    UI --> Jobs --> Core
+    View --> Disk
+    Core --> Disk
+    Core --> Colmap
+    Core --> Ai
 ```
 
-Everything runs on the user's computer, and nothing is uploaded. During development,
-one command will start both parts with live reloading.
+Everything runs on the user's computer, and nothing is uploaded.

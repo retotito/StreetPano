@@ -6,8 +6,16 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The app is now written in C++ with Qt, and the Python code became developer tools in
+  `tools/`
+
 ### Added
 
+- First window, which opens a folder of photos and shows a film strip and a zoomable
+  photo view
+- Memory and thread checks in CI, on Linux, macOS and Windows builds
 - Concept documentation, diagrams and decision records
 - `streetpano estimate` command for capture planning
 - `streetpano synth` command for test streets with exact ground truth

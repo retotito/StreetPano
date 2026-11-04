@@ -5,6 +5,6 @@ updates:
     schedule:
       interval: monthly
   - package-ecosystem: uv
-    directory: /
+    directory: /tools
     schedule:
       interval: monthly

@@ -1,0 +1,36 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": { "STREETPANO_WERROR": "ON" }
+    },
+    { "name": "dev", "inherits": "base", "displayName": "Development",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" } },
+    { "name": "release", "inherits": "base", "displayName": "Release",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" } },
+    { "name": "asan", "inherits": "base", "displayName": "Address and undefined behaviour checks",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "STREETPANO_SANITIZE": "address,undefined" } },
+    { "name": "tsan", "inherits": "base", "displayName": "Thread checks",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "STREETPANO_SANITIZE": "thread" } },
+    { "name": "coverage", "inherits": "base", "displayName": "Test coverage",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "STREETPANO_COVERAGE": "ON" } }
+  ],
+  "buildPresets": [
+    { "name": "dev", "configurePreset": "dev" },
+    { "name": "release", "configurePreset": "release" },
+    { "name": "asan", "configurePreset": "asan" },
+    { "name": "tsan", "configurePreset": "tsan" },
+    { "name": "coverage", "configurePreset": "coverage" }
+  ],
+  "testPresets": [
+    { "name": "dev", "configurePreset": "dev", "output": { "outputOnFailure": true } },
+    { "name": "release", "configurePreset": "release", "output": { "outputOnFailure": true } },
+    { "name": "asan", "configurePreset": "asan", "output": { "outputOnFailure": true } },
+    { "name": "tsan", "configurePreset": "tsan", "output": { "outputOnFailure": true } },
+    { "name": "coverage", "configurePreset": "coverage", "output": { "outputOnFailure": true } }
+  ]
+}

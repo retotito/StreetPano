@@ -1,6 +1,6 @@
 # 0001: Python first, Rust for slow parts
 
-**Status:** Accepted
+**Status:** Replaced by [0010](0010-cpp-and-qt.md)
 
 ## Context
 
