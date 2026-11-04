@@ -12,3 +12,4 @@ All notable changes are documented here. The format follows
 - `streetpano estimate` command for capture planning
 - `streetpano synth` command for test streets with exact ground truth
 - Automated tests, type checks, linting and CI
+- Design for downloading AI models on demand

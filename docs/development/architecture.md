@@ -66,6 +66,7 @@ src/streetpano/
 ├── seams/           Graph cut and local alignment
 ├── render/          Blending, tiles and export
 ├── jobs/            Job queue and memory budget
+├── models/          Model list, downloads and verification
 └── server/          Local API for the review tool
 ```
 
