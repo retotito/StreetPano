@@ -41,6 +41,7 @@ so these objects get cut or doubled.
 | Overview and goals | [Concept overview](docs/concept/overview.md) |
 | How to shoot a street | [Capture guide](docs/concept/capture.md) |
 | Processing steps | [Pipeline](docs/concept/pipeline.md) |
+| Screens and workflow | [User interface](docs/concept/ui-workflow.md) |
 | Marking objects | [Foreground objects](docs/concept/foreground.md) |
 | Verticals and sloped streets | [Geometry correction](docs/concept/geometry-correction.md) |
 | RAW, JPEG and output files | [File formats](docs/concept/formats.md) |

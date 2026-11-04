@@ -7,6 +7,9 @@
 | **Internal processing** | 16-bit TIFF, plus small previews | Keeps quality through corrections |
 | **Output** | BigTIFF master, JPEG or WebP viewer tiles | Standard TIFF stops at 4 GB, which a long street can exceed |
 
+JPEG can't exceed 65,535 px per side, and WebP can't exceed 16,383 px. So long
+panoramas use these formats only for tiles or split sections.
+
 ## RAW
 
 Use the same development settings across the whole sequence. Separate per-photo

@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 650" width="1100" height="650" role="img" aria-labelledby="t d" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title id="t">Editor screen sketch</title>
+  <desc id="d">A sketch of the editor, with tool tabs across the top, the panorama in the centre, a selected car with keep and remove options on the right, an overview strip below, and job status at the bottom.</desc>
+  <rect width="1100" height="650" fill="#ffffff"/>
+  <rect x="20" y="20" width="1060" height="610" rx="8" fill="#f9fafb" stroke="#9ca3af" stroke-width="1.5"/>
+
+  <rect x="20" y="20" width="1060" height="52" rx="8" fill="#1f2937"/>
+  <text x="40" y="52" font-size="15" font-weight="600" fill="#ffffff">‹ Projects  /  Main Street</text>
+  <g font-size="14" text-anchor="middle">
+    <rect x="310" y="32" width="90" height="28" rx="5" fill="#374151"/><text x="355" y="51" fill="#ffffff">Verticals</text>
+    <rect x="408" y="32" width="90" height="28" rx="5" fill="#374151"/><text x="453" y="51" fill="#ffffff">Seams</text>
+    <rect x="506" y="32" width="90" height="28" rx="5" fill="#2563eb"/><text x="551" y="51" fill="#ffffff" font-weight="600">Objects</text>
+    <rect x="604" y="32" width="90" height="28" rx="5" fill="#374151"/><text x="649" y="51" fill="#ffffff">Slope</text>
+    <rect x="702" y="32" width="90" height="28" rx="5" fill="#374151"/><text x="747" y="51" fill="#ffffff">Export</text>
+  </g>
+  <text x="980" y="52" font-size="14" fill="#d1d5db" text-anchor="middle">↶ Undo   ↷ Redo</text>
+
+  <rect x="36" y="88" width="780" height="340" fill="#dbeafe" stroke="#9ca3af"/>
+  <g stroke="#6b7280">
+    <rect x="36" y="150" width="240" height="278" fill="#fde68a"/>
+    <rect x="276" y="120" width="290" height="308" fill="#d1d5db"/>
+    <rect x="566" y="170" width="250" height="258" fill="#fecaca"/>
+  </g>
+  <g fill="#ffffff" stroke="#6b7280">
+    <rect x="66" y="180" width="44" height="60"/><rect x="136" y="180" width="44" height="60"/><rect x="206" y="180" width="44" height="60"/>
+    <rect x="66" y="270" width="44" height="60"/><rect x="136" y="270" width="44" height="60"/><rect x="206" y="270" width="44" height="60"/>
+    <rect x="306" y="150" width="44" height="60"/><rect x="386" y="150" width="44" height="60"/><rect x="466" y="150" width="44" height="60"/>
+    <rect x="306" y="240" width="44" height="60"/><rect x="386" y="240" width="44" height="60"/><rect x="466" y="240" width="44" height="60"/>
+    <rect x="596" y="200" width="44" height="60"/><rect x="676" y="200" width="44" height="60"/><rect x="746" y="200" width="44" height="60"/>
+    <rect x="596" y="290" width="44" height="60"/><rect x="676" y="290" width="44" height="60"/><rect x="746" y="290" width="44" height="60"/>
+  </g>
+  <rect x="96" y="372" width="130" height="50" rx="8" fill="#6b7280"/>
+  <rect x="340" y="362" width="170" height="60" rx="9" fill="#374151"/>
+  <rect x="332" y="354" width="186" height="76" rx="6" fill="none" stroke="#2563eb" stroke-width="3" stroke-dasharray="7 4"/>
+  <rect x="626" y="240" width="20" height="188" fill="#15803d"/>
+  <rect x="616" y="238" width="40" height="192" rx="4" fill="none" stroke="#d97706" stroke-width="2" stroke-dasharray="5 4"/>
+  <text x="636" y="228" font-size="12" fill="#92400e" text-anchor="middle">Suggested</text>
+  <text x="425" y="346" font-size="13" font-weight="600" fill="#1d4ed8" text-anchor="middle">Selected: car</text>
+
+  <rect x="830" y="88" width="234" height="340" rx="6" fill="#ffffff" stroke="#d1d5db"/>
+  <text x="846" y="114" font-size="15" font-weight="600" fill="#1f2937">Selected object</text>
+  <g font-size="14" fill="#1f2937">
+    <rect x="846" y="128" width="202" height="34" rx="5" fill="#eff6ff" stroke="#2563eb"/><text x="858" y="150" font-weight="600">● Keep whole</text>
+    <rect x="846" y="170" width="202" height="34" rx="5" fill="#ffffff" stroke="#d1d5db"/><text x="858" y="192">○ Remove</text>
+    <rect x="846" y="212" width="202" height="34" rx="5" fill="#ffffff" stroke="#d1d5db"/><text x="858" y="234">○ Remove and fill</text>
+  </g>
+  <text x="846" y="272" font-size="13" fill="#4b5563">If removed:</text>
+  <rect x="846" y="280" width="202" height="14" fill="#e5e7eb"/>
+  <rect x="846" y="280" width="186" height="14" fill="#15803d"/>
+  <text x="846" y="312" font-size="13" fill="#15803d">92% real photo pixels</text>
+  <text x="846" y="332" font-size="13" fill="#b91c1c">8% would be generated</text>
+  <rect x="846" y="350" width="202" height="30" rx="5" fill="#f3f4f6" stroke="#d1d5db"/><text x="947" y="370" font-size="13" text-anchor="middle" fill="#1f2937">Show source photos</text>
+  <text x="846" y="406" font-size="12" fill="#6b7280">Tools: click, lasso, suggestions</text>
+
+  <rect x="36" y="442" width="1028" height="92" fill="#ffffff" stroke="#d1d5db"/>
+  <text x="46" y="462" font-size="13" fill="#4b5563">Whole street</text>
+  <rect x="46" y="472" width="1008" height="46" fill="#e5e7eb" stroke="#9ca3af"/>
+  <g fill="#9ca3af">
+    <rect x="60" y="486" width="90" height="32"/><rect x="170" y="478" width="110" height="40"/><rect x="300" y="490" width="80" height="28"/><rect x="400" y="480" width="120" height="38"/><rect x="540" y="486" width="90" height="32"/><rect x="650" y="476" width="130" height="42"/><rect x="800" y="488" width="100" height="30"/><rect x="920" y="480" width="120" height="38"/>
+  </g>
+  <rect x="300" y="470" width="170" height="50" fill="#2563eb" fill-opacity="0.22" stroke="#2563eb" stroke-width="2.5"/>
+
+  <rect x="36" y="548" width="1028" height="66" fill="#ffffff" stroke="#d1d5db"/>
+  <text x="50" y="574" font-size="14" font-weight="600" fill="#1f2937">Updating seams near the car</text>
+  <rect x="50" y="586" width="380" height="12" rx="3" fill="#e5e7eb"/><rect x="50" y="586" width="240" height="12" rx="3" fill="#2563eb"/>
+  <text x="444" y="597" font-size="13" fill="#4b5563">63%, shown at preview quality</text>
+  <text x="1050" y="574" font-size="13" fill="#4b5563" text-anchor="end">Memory 3.1 of 4 GB</text>
+  <text x="1050" y="597" font-size="13" fill="#4b5563" text-anchor="end">Disk: 18 GB free</text>
+</svg>

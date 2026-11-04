@@ -37,6 +37,7 @@ nav:
       - Overview: concept/overview.md
       - Capture guide: concept/capture.md
       - Pipeline: concept/pipeline.md
+      - User interface and workflow: concept/ui-workflow.md
       - Foreground objects: concept/foreground.md
       - Geometry correction: concept/geometry-correction.md
       - File formats: concept/formats.md
@@ -56,3 +57,4 @@ nav:
       - "0006: Code and model licensing": adr/0006-code-and-model-licensing.md
       - "0007: On-demand model manager": adr/0007-on-demand-model-manager.md
       - "0008: Fixed focal length": adr/0008-fixed-focal-length.md
+      - "0009: Svelte and FastAPI for the interface": adr/0009-web-ui-stack.md

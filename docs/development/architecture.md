@@ -45,7 +45,7 @@ flowchart TB
 |---|---|---|
 | Pipeline | Python, PyTorch, OpenCV, pyvips | Most vision and AI tooling is built for it |
 | Slow parts | Rust through PyO3, only after profiling | Fast and memory-safe |
-| Review tool | Local web app with FastAPI and OpenSeadragon | Deep-zoom viewing already exists |
+| User interface | Local web app with Svelte, FastAPI and OpenSeadragon, and possibly Tauri later | [Deep-zoom viewing already exists](../adr/0009-web-ui-stack.md) |
 | Environment | uv | Fast, with a reproducible lockfile |
 
 See the [decision record](../adr/0001-python-first-rust-for-slow-parts.md).

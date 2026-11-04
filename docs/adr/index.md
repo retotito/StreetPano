@@ -14,3 +14,4 @@ new record that replaces it.
 | [0006](0006-code-and-model-licensing.md) | Code and model licensing | Accepted |
 | [0007](0007-on-demand-model-manager.md) | On-demand model manager | Accepted |
 | [0008](0008-fixed-focal-length.md) | Fixed focal length | Accepted |
+| [0009](0009-web-ui-stack.md) | Svelte and FastAPI for the interface | Accepted |
