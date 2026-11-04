@@ -1,0 +1,56 @@
+site_name: StreetPano
+site_description: Build very long street panoramas from photos taken while walking.
+repo_url: https://github.com/retotito/StreetPano
+repo_name: retotito/StreetPano
+strict: true
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+nav:
+  - Home: index.md
+  - Concept:
+      - Overview: concept/overview.md
+      - Capture guide: concept/capture.md
+      - Pipeline: concept/pipeline.md
+      - Foreground objects: concept/foreground.md
+      - Geometry correction: concept/geometry-correction.md
+      - File formats: concept/formats.md
+      - Memory and disk: concept/memory.md
+      - AI models: concept/ai-models.md
+  - Development:
+      - Architecture: development/architecture.md
+      - Testing: development/testing.md
+  - Roadmap: roadmap.md
+  - Decision records:
+      - adr/index.md
+      - "0001: Python first, Rust for slow parts": adr/0001-python-first-rust-for-slow-parts.md
+      - "0002: Geometry first, AI assists": adr/0002-geometry-first-ai-assists.md
+      - "0003: Photos as the main capture": adr/0003-photos-as-main-capture.md
+      - "0004: Non-destructive project model": adr/0004-non-destructive-project-model.md
+      - "0005: Tiles and memory budgets": adr/0005-tiles-and-memory-budgets.md
+      - "0006: Code and model licensing": adr/0006-code-and-model-licensing.md

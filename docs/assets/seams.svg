@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 470" width="900" height="470" role="img" aria-labelledby="t d" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title id="t">Straight seams compared with graph-cut seams</title>
+  <desc id="d">Straight seams cut a car in two. Seams chosen by graph cut go around the car and keep it whole.</desc>
+  <rect width="900" height="470" fill="#ffffff"/>
+  <text x="40.0" y="28.0" font-size="17" fill="#dc2626" text-anchor="start" font-weight="600">Straight seams: objects get cut or doubled</text>
+  <rect x="40.0" y="44.0" width="164.0" height="150.0" fill="#dbeafe" stroke="none" stroke-width="1" rx="0"/>
+  <rect x="204.0" y="44.0" width="164.0" height="150.0" fill="#fef3c7" stroke="none" stroke-width="1" rx="0"/>
+  <rect x="368.0" y="44.0" width="164.0" height="150.0" fill="#dcfce7" stroke="none" stroke-width="1" rx="0"/>
+  <rect x="532.0" y="44.0" width="164.0" height="150.0" fill="#fce7f3" stroke="none" stroke-width="1" rx="0"/>
+  <rect x="696.0" y="44.0" width="164.0" height="150.0" fill="#ede9fe" stroke="none" stroke-width="1" rx="0"/>
+  <rect x="58.0" y="64.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="120.0" y="64.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="182.0" y="64.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="244.0" y="64.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="306.0" y="64.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="368.0" y="64.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="430.0" y="64.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="492.0" y="64.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="554.0" y="64.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="616.0" y="64.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="678.0" y="64.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="740.0" y="64.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="802.0" y="64.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="58.0" y="106.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="120.0" y="106.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="182.0" y="106.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="244.0" y="106.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="306.0" y="106.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="368.0" y="106.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="430.0" y="106.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="492.0" y="106.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="554.0" y="106.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="616.0" y="106.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="678.0" y="106.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="740.0" y="106.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="802.0" y="106.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="300.0" y="149.0" width="68.0" height="38.0" fill="#374151" stroke="none" stroke-width="1" rx="6"/>
+  <rect x="368.0" y="158.0" width="62.0" height="29.0" fill="#6b7280" stroke="none" stroke-width="1" rx="6"/>
+  <line x1="204.0" y1="44.0" x2="204.0" y2="194.0" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 4"/>
+  <line x1="368.0" y1="44.0" x2="368.0" y2="194.0" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 4"/>
+  <line x1="532.0" y1="44.0" x2="532.0" y2="194.0" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 4"/>
+  <line x1="696.0" y1="44.0" x2="696.0" y2="194.0" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 4"/>
+  <rect x="346.0" y="144.0" width="44.0" height="48.0" fill="none" stroke="#dc2626" stroke-width="2" rx="4"/>
+  <text x="370.0" y="214.0" font-size="14" fill="#dc2626" text-anchor="middle" font-weight="400">Car broken at the seam</text>
+  <text x="40.0" y="246.0" font-size="17" fill="#15803d" text-anchor="start" font-weight="600">Seams chosen by graph cut: the car stays whole</text>
+  <rect x="40.0" y="262.0" width="820.0" height="150.0" fill="#dbeafe" stroke="none" stroke-width="1" rx="0"/>
+  <path d="M 204 262 C 190 322, 232 372, 214 412 L 420 412 C 430 372, 404 322, 424 262 Z" fill="#fef3c7"/>
+  <path d="M 424 262 C 404 322, 430 372, 420 412 L 610 412 C 622 372, 594 322, 612 262 Z" fill="#dcfce7"/>
+  <path d="M 612 262 C 594 322, 622 372, 610 412 L 860 412 L 860 262 Z" fill="#fce7f3"/>
+  <rect x="58.0" y="282.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="120.0" y="282.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="182.0" y="282.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="244.0" y="282.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="306.0" y="282.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="368.0" y="282.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="430.0" y="282.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="492.0" y="282.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="554.0" y="282.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="616.0" y="282.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="678.0" y="282.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="740.0" y="282.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="802.0" y="282.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="58.0" y="324.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="120.0" y="324.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="182.0" y="324.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="244.0" y="324.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="306.0" y="324.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="368.0" y="324.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="430.0" y="324.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="492.0" y="324.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="554.0" y="324.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="616.0" y="324.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="678.0" y="324.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="740.0" y="324.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="802.0" y="324.0" width="26.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <path d="M 204 262 C 190 322, 232 372, 214 412" fill="none" stroke="#15803d" stroke-width="2.5"/>
+  <path d="M 424 262 C 404 322, 430 372, 420 412" fill="none" stroke="#15803d" stroke-width="2.5"/>
+  <path d="M 612 262 C 594 322, 622 372, 610 412" fill="none" stroke="#15803d" stroke-width="2.5"/>
+  <rect x="300.0" y="367.0" width="100.0" height="38.0" fill="#374151" stroke="none" stroke-width="1" rx="6"/>
+  <text x="350.0" y="432.0" font-size="14" fill="#15803d" text-anchor="middle" font-weight="400">Car comes from one photo</text>
+  <text x="40.0" y="458.0" font-size="14" fill="#6b7280" text-anchor="start" font-weight="400">Each colour marks the source photo. The seam follows places where neighbouring photos agree.</text>
+</svg>

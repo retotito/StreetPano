@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 420" width="880" height="420" role="img" aria-labelledby="t d" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title id="t">Tile pyramid</title>
+  <desc id="d">At every zoom level the viewport covers a similar number of tiles, so memory use stays flat.</desc>
+  <rect width="880" height="420" fill="#ffffff"/>
+  <text x="40.0" y="30.0" font-size="17" fill="#1f2937" text-anchor="start" font-weight="600">Tile pyramid: the screen always needs about the same number of tiles</text>
+  <text x="40.0" y="72.0" font-size="14" fill="#6b7280" text-anchor="start" font-weight="400">Zoomed out: whole street, low detail</text>
+  <rect x="40.0" y="84.0" width="200.0" height="56.0" fill="#bfdbfe" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="240.0" y="84.0" width="200.0" height="56.0" fill="#bfdbfe" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="440.0" y="84.0" width="200.0" height="56.0" fill="#bfdbfe" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="640.0" y="84.0" width="200.0" height="56.0" fill="#bfdbfe" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="40.0" y="84.0" width="800.0" height="56.0" fill="none" stroke="#2563eb" stroke-width="3" rx="0"/>
+  <text x="40.0" y="182.0" font-size="14" fill="#6b7280" text-anchor="start" font-weight="400">Middle: part of the street</text>
+  <rect x="40.0" y="194.0" width="100.0" height="56.0" fill="#f3f4f6" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="140.0" y="194.0" width="100.0" height="56.0" fill="#fef3c7" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="240.0" y="194.0" width="100.0" height="56.0" fill="#bfdbfe" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="340.0" y="194.0" width="100.0" height="56.0" fill="#bfdbfe" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="440.0" y="194.0" width="100.0" height="56.0" fill="#bfdbfe" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="540.0" y="194.0" width="100.0" height="56.0" fill="#bfdbfe" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="640.0" y="194.0" width="100.0" height="56.0" fill="#fef3c7" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="740.0" y="194.0" width="100.0" height="56.0" fill="#f3f4f6" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="240.0" y="194.0" width="400.0" height="56.0" fill="none" stroke="#2563eb" stroke-width="3" rx="0"/>
+  <text x="40.0" y="292.0" font-size="14" fill="#6b7280" text-anchor="start" font-weight="400">Zoomed in: full detail</text>
+  <rect x="40.0" y="304.0" width="50.0" height="50.0" fill="#f3f4f6" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="90.0" y="304.0" width="50.0" height="50.0" fill="#f3f4f6" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="140.0" y="304.0" width="50.0" height="50.0" fill="#f3f4f6" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="190.0" y="304.0" width="50.0" height="50.0" fill="#f3f4f6" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="240.0" y="304.0" width="50.0" height="50.0" fill="#f3f4f6" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="290.0" y="304.0" width="50.0" height="50.0" fill="#fef3c7" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="340.0" y="304.0" width="50.0" height="50.0" fill="#bfdbfe" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="390.0" y="304.0" width="50.0" height="50.0" fill="#bfdbfe" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="440.0" y="304.0" width="50.0" height="50.0" fill="#bfdbfe" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="490.0" y="304.0" width="50.0" height="50.0" fill="#bfdbfe" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="540.0" y="304.0" width="50.0" height="50.0" fill="#fef3c7" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="590.0" y="304.0" width="50.0" height="50.0" fill="#f3f4f6" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="640.0" y="304.0" width="50.0" height="50.0" fill="#f3f4f6" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="690.0" y="304.0" width="50.0" height="50.0" fill="#f3f4f6" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="740.0" y="304.0" width="50.0" height="50.0" fill="#f3f4f6" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="790.0" y="304.0" width="50.0" height="50.0" fill="#f3f4f6" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="340.0" y="304.0" width="200.0" height="50.0" fill="none" stroke="#2563eb" stroke-width="3" rx="0"/>
+  <rect x="40.0" y="385.0" width="18.0" height="18.0" fill="#bfdbfe" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <text x="66.0" y="399.0" font-size="14" fill="#1f2937" text-anchor="start" font-weight="400">Visible: in memory</text>
+  <rect x="240.0" y="385.0" width="18.0" height="18.0" fill="#fef3c7" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <text x="266.0" y="399.0" font-size="14" fill="#1f2937" text-anchor="start" font-weight="400">Loaded ahead for scrolling</text>
+  <rect x="490.0" y="385.0" width="18.0" height="18.0" fill="#f3f4f6" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <text x="516.0" y="399.0" font-size="14" fill="#1f2937" text-anchor="start" font-weight="400">On disk only</text>
+</svg>

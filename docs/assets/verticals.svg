@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 355" width="880" height="355" role="img" aria-labelledby="t d" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title id="t">Correcting vertical lines</title>
+  <desc id="d">A tilted camera makes walls lean inwards. Rotating the camera model makes them vertical, and a user can draw a line to guide it.</desc>
+  <rect width="880" height="355" fill="#ffffff"/>
+  <text x="40.0" y="30.0" font-size="16" fill="#dc2626" text-anchor="start" font-weight="600">Tilted camera: walls lean inwards</text>
+  <polygon points="95.0,300.0 345.0,300.0 305.0,70.0 135.0,70.0" fill="#e5e7eb" stroke="#6b7280" stroke-width="2"/>
+  <rect x="146.3" y="240.0" width="30.4" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="263.3" y="240.0" width="30.4" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="151.8" y="189.4" width="28.1" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="260.0" y="189.4" width="28.1" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="157.4" y="138.8" width="25.8" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="256.8" y="138.8" width="25.8" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="162.9" y="88.2" width="23.6" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="253.5" y="88.2" width="23.6" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <line x1="95.0" y1="300.0" x2="135.0" y2="70.0" stroke="#dc2626" stroke-width="3"/>
+  <line x1="345.0" y1="300.0" x2="305.0" y2="70.0" stroke="#dc2626" stroke-width="3"/>
+  <text x="545.0" y="30.0" font-size="16" fill="#15803d" text-anchor="start" font-weight="600">Corrected: walls are truly vertical</text>
+  <rect x="560.0" y="70.0" width="250.0" height="230.0" fill="#e5e7eb" stroke="#6b7280" stroke-width="2" rx="0"/>
+  <rect x="607.0" y="240.0" width="32.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="731.0" y="240.0" width="32.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="607.0" y="189.4" width="32.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="731.0" y="189.4" width="32.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="607.0" y="138.8" width="32.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="731.0" y="138.8" width="32.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="607.0" y="88.2" width="32.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <rect x="731.0" y="88.2" width="32.0" height="28.0" fill="#ffffff" stroke="#6b7280" stroke-width="1" rx="0"/>
+  <line x1="560.0" y1="70.0" x2="560.0" y2="300.0" stroke="#15803d" stroke-width="3"/>
+  <line x1="810.0" y1="70.0" x2="810.0" y2="300.0" stroke="#15803d" stroke-width="3"/>
+  <path d="M 395 185 L 505 185" stroke="#1f2937" stroke-width="2.5" marker-end="url(#a)"/>
+  <defs><marker id="a" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 Z" fill="#1f2937"/></marker></defs>
+  <text x="450.0" y="168.0" font-size="13" fill="#6b7280" text-anchor="middle" font-weight="400">Rotate the camera model</text>
+  <line x1="135.0" y1="70.0" x2="95.0" y2="300.0" stroke="#2563eb" stroke-width="2" stroke-dasharray="7 5"/>
+  <circle cx="135.0" cy="70.0" r="6" fill="#2563eb"/>
+  <circle cx="95.0" cy="300.0" r="6" fill="#2563eb"/>
+  <text x="40.0" y="335.0" font-size="14" fill="#2563eb" text-anchor="start" font-weight="400">Manual correction: draw a line along an edge and mark it as vertical (blue).</text>
+</svg>

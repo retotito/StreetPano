@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 620" width="800" height="620" role="img" aria-labelledby="t d" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title id="t">Three ways to show a sloped street</title>
+  <desc id="d">Natural keeps windows level with a climbing road. Smooth flatten makes the road straight with slanted windows. Stepped flatten keeps each building level with steps between buildings.</desc>
+  <rect width="800" height="620" fill="#ffffff"/>
+  <text x="40.0" y="22.0" font-size="16" fill="#1f2937" text-anchor="start" font-weight="600">Natural</text>
+  <text x="300.0" y="22.0" font-size="14" fill="#6b7280" text-anchor="start" font-weight="400">True view. Windows stay level, the road climbs.</text>
+  <polygon points="80.0,98.0 290.0,98.0 290.0,178.0 80.0,198.0" fill="#dbeafe" stroke="#6b7280" stroke-width="1.5"/>
+  <polygon points="109.4,113.0 140.9,113.0 140.9,129.0 109.4,129.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="166.1,113.0 197.6,113.0 197.6,129.0 166.1,129.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="222.8,113.0 254.3,113.0 254.3,129.0 222.8,129.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="109.4,143.0 140.9,143.0 140.9,159.0 109.4,159.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="166.1,143.0 197.6,143.0 197.6,159.0 166.1,159.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="222.8,143.0 254.3,143.0 254.3,159.0 222.8,159.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="290.0,78.0 500.0,78.0 500.0,158.0 290.0,178.0" fill="#fef3c7" stroke="#6b7280" stroke-width="1.5"/>
+  <polygon points="319.4,93.0 350.9,93.0 350.9,109.0 319.4,109.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="376.1,93.0 407.6,93.0 407.6,109.0 376.1,109.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="432.8,93.0 464.3,93.0 464.3,109.0 432.8,109.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="319.4,123.0 350.9,123.0 350.9,139.0 319.4,139.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="376.1,123.0 407.6,123.0 407.6,139.0 376.1,139.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="432.8,123.0 464.3,123.0 464.3,139.0 432.8,139.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="500.0,58.0 710.0,58.0 710.0,138.0 500.0,158.0" fill="#dcfce7" stroke="#6b7280" stroke-width="1.5"/>
+  <polygon points="529.4,73.0 560.9,73.0 560.9,89.0 529.4,89.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="586.1,73.0 617.6,73.0 617.6,89.0 586.1,89.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="642.8,73.0 674.3,73.0 674.3,89.0 642.8,89.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="529.4,103.0 560.9,103.0 560.9,119.0 529.4,119.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="586.1,103.0 617.6,103.0 617.6,119.0 586.1,119.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="642.8,103.0 674.3,103.0 674.3,119.0 642.8,119.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <line x1="80.0" y1="198.0" x2="290.0" y2="178.0" stroke="#1f2937" stroke-width="3.5"/>
+  <line x1="290.0" y1="178.0" x2="500.0" y2="158.0" stroke="#1f2937" stroke-width="3.5"/>
+  <line x1="500.0" y1="158.0" x2="710.0" y2="138.0" stroke="#1f2937" stroke-width="3.5"/>
+  <text x="40.0" y="227.0" font-size="16" fill="#1f2937" text-anchor="start" font-weight="600">Smooth flatten</text>
+  <text x="300.0" y="227.0" font-size="14" fill="#6b7280" text-anchor="start" font-weight="400">Straight road. Window lines become slanted.</text>
+  <polygon points="80.0,303.0 290.0,323.0 290.0,403.0 80.0,403.0" fill="#dbeafe" stroke="#6b7280" stroke-width="1.5"/>
+  <polygon points="109.4,320.8 140.9,323.8 140.9,339.8 109.4,336.8" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="166.1,326.2 197.6,329.2 197.6,345.2 166.1,342.2" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="222.8,331.6 254.3,334.6 254.3,350.6 222.8,347.6" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="109.4,350.8 140.9,353.8 140.9,369.8 109.4,366.8" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="166.1,356.2 197.6,359.2 197.6,375.2 166.1,372.2" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="222.8,361.6 254.3,364.6 254.3,380.6 222.8,377.6" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="290.0,303.0 500.0,323.0 500.0,403.0 290.0,403.0" fill="#fef3c7" stroke="#6b7280" stroke-width="1.5"/>
+  <polygon points="319.4,320.8 350.9,323.8 350.9,339.8 319.4,336.8" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="376.1,326.2 407.6,329.2 407.6,345.2 376.1,342.2" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="432.8,331.6 464.3,334.6 464.3,350.6 432.8,347.6" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="319.4,350.8 350.9,353.8 350.9,369.8 319.4,366.8" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="376.1,356.2 407.6,359.2 407.6,375.2 376.1,372.2" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="432.8,361.6 464.3,364.6 464.3,380.6 432.8,377.6" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="500.0,303.0 710.0,323.0 710.0,403.0 500.0,403.0" fill="#dcfce7" stroke="#6b7280" stroke-width="1.5"/>
+  <polygon points="529.4,320.8 560.9,323.8 560.9,339.8 529.4,336.8" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="586.1,326.2 617.6,329.2 617.6,345.2 586.1,342.2" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="642.8,331.6 674.3,334.6 674.3,350.6 642.8,347.6" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="529.4,350.8 560.9,353.8 560.9,369.8 529.4,366.8" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="586.1,356.2 617.6,359.2 617.6,375.2 586.1,372.2" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="642.8,361.6 674.3,364.6 674.3,380.6 642.8,377.6" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <line x1="80.0" y1="403.0" x2="290.0" y2="403.0" stroke="#1f2937" stroke-width="3.5"/>
+  <line x1="290.0" y1="403.0" x2="500.0" y2="403.0" stroke="#1f2937" stroke-width="3.5"/>
+  <line x1="500.0" y1="403.0" x2="710.0" y2="403.0" stroke="#1f2937" stroke-width="3.5"/>
+  <text x="40.0" y="432.0" font-size="16" fill="#1f2937" text-anchor="start" font-weight="600">Stepped flatten</text>
+  <text x="300.0" y="432.0" font-size="14" fill="#6b7280" text-anchor="start" font-weight="400">Each building stays level, with steps between them.</text>
+  <polygon points="80.0,518.0 290.0,518.0 290.0,598.0 80.0,618.0" fill="#dbeafe" stroke="#6b7280" stroke-width="1.5"/>
+  <polygon points="109.4,533.0 140.9,533.0 140.9,549.0 109.4,549.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="166.1,533.0 197.6,533.0 197.6,549.0 166.1,549.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="222.8,533.0 254.3,533.0 254.3,549.0 222.8,549.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="109.4,563.0 140.9,563.0 140.9,579.0 109.4,579.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="166.1,563.0 197.6,563.0 197.6,579.0 166.1,579.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="222.8,563.0 254.3,563.0 254.3,579.0 222.8,579.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="290.0,518.0 500.0,518.0 500.0,598.0 290.0,618.0" fill="#fef3c7" stroke="#6b7280" stroke-width="1.5"/>
+  <polygon points="319.4,533.0 350.9,533.0 350.9,549.0 319.4,549.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="376.1,533.0 407.6,533.0 407.6,549.0 376.1,549.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="432.8,533.0 464.3,533.0 464.3,549.0 432.8,549.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="319.4,563.0 350.9,563.0 350.9,579.0 319.4,579.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="376.1,563.0 407.6,563.0 407.6,579.0 376.1,579.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="432.8,563.0 464.3,563.0 464.3,579.0 432.8,579.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="500.0,518.0 710.0,518.0 710.0,598.0 500.0,618.0" fill="#dcfce7" stroke="#6b7280" stroke-width="1.5"/>
+  <polygon points="529.4,533.0 560.9,533.0 560.9,549.0 529.4,549.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="586.1,533.0 617.6,533.0 617.6,549.0 586.1,549.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="642.8,533.0 674.3,533.0 674.3,549.0 642.8,549.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="529.4,563.0 560.9,563.0 560.9,579.0 529.4,579.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="586.1,563.0 617.6,563.0 617.6,579.0 586.1,579.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <polygon points="642.8,563.0 674.3,563.0 674.3,579.0 642.8,579.0" fill="#ffffff" stroke="#6b7280" stroke-width="1"/>
+  <line x1="80.0" y1="618.0" x2="290.0" y2="598.0" stroke="#1f2937" stroke-width="3.5"/>
+  <line x1="290.0" y1="618.0" x2="500.0" y2="598.0" stroke="#1f2937" stroke-width="3.5"/>
+  <line x1="500.0" y1="618.0" x2="710.0" y2="598.0" stroke="#1f2937" stroke-width="3.5"/>
+</svg>
