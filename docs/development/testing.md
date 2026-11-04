@@ -55,7 +55,13 @@ without lens distortion, so passing on synthetic streets is necessary but not
 sufficient. Real photos are still needed.
 
 The tests confirm that rendered parallax and occlusion match the formulas in
-`streetpano.geometry`.
+`streetpano.geometry`. They also set accuracy limits for camera positions, so a change
+that makes them worse fails the tests. To measure a street yourself:
+
+```sh
+uv run streetpano poses my-street/photos my-street-poses \
+  --focal-px 853.333 --truth my-street/scene.json
+```
 
 Synthetic streets allow direct measurements:
 

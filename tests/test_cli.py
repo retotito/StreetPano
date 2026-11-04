@@ -1,10 +1,12 @@
 import runpy
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from streetpano import __version__
 from streetpano.cli import main
+from streetpano.poses import CameraPose, PoseEstimate
 
 
 def test_version(capsys: pytest.CaptureFixture[str]) -> None:
@@ -73,3 +75,44 @@ def test_synth_refuses_a_folder_that_is_not_empty(
         main(["synth", str(tmp_path)])
     assert exit_info.value.code == 2
     assert "not empty" in capsys.readouterr().err
+
+
+@pytest.fixture
+def small_street(tmp_path: Path) -> Path:
+    street = tmp_path / "street"
+    main(["synth", str(street), "--length", "8", "--width", "960", "--height", "540"])
+    return street
+
+
+def test_poses_measures_a_synthetic_street(
+    small_street: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    capsys.readouterr()
+    output = tmp_path / "poses"
+    arguments = [
+        "poses",
+        str(small_street / "photos"),
+        str(output),
+        "--focal-px",
+        "640",
+        "--truth",
+        str(small_street / "scene.json"),
+    ]
+    assert main(arguments) == 0
+    text = capsys.readouterr().out
+    assert "Registered 9 photos" in text
+    assert "Facade distance:" in text
+    assert (output / "poses.json").exists()
+
+
+def test_poses_reports_missing_photos(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    pose = CameraPose("a.png", (0.0, 0.0, 0.0), ((1.0, 0.0, 0.0),) * 3)
+    result = PoseEstimate((pose,), np.empty((0, 3)), 800.0, ("b.png",), 0.2)
+    monkeypatch.setattr("streetpano.cli.estimate_poses", lambda *_: result)
+    arguments = ["poses", "photos", str(tmp_path), "--focal-px", "800"]
+    assert main(arguments) == 0
+    assert "Missing: b.png" in capsys.readouterr().out

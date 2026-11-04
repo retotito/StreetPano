@@ -51,6 +51,9 @@ steps run through a job queue, which sets parallelism from the available budget.
 These are starting values to be measured and adjusted. AI models may not fit within
 this budget at useful quality, so the design allows them to run on a remote GPU.
 
+COLMAP needs watching. It peaked at 2.2 GB on 41 photos of only 1280 × 720 px, so
+real photos will need a limit on image size or sections processed separately.
+
 ## Size estimates
 
 These assume a 24 MP camera, 3.75 mm/px on the facade, and a 4,000 px tall panorama.

@@ -4,6 +4,9 @@ Coordinates are in metres: X runs along the street, Y points up, and Z points fr
 the walking path towards the facade. The facade is a flat plane at a fixed Z, and
 foreground objects are boxes. This is deliberately simple. It provides known camera
 positions, depths and object outlines, not photorealism.
+
+The world is left-handed, because image right, up and forward map directly to X, Y
+and Z. COLMAP's world is right-handed, so aligning the two involves a mirror image.
 """
 
 import json

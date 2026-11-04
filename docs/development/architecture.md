@@ -2,7 +2,7 @@
 
 !!! note
     This is the planned structure. Today, the package contains only `geometry`,
-    `sizing`, `synthetic` and `cli`.
+    `sizing`, `synthetic`, `poses` and `cli`.
 
 ## Components
 
@@ -57,10 +57,10 @@ src/streetpano/
 ├── geometry.py      Capture geometry (exists)
 ├── sizing.py        Size estimates (exists)
 ├── synthetic.py     Test streets with exact ground truth (exists)
+├── poses.py         Camera positions through COLMAP (exists)
 ├── cli.py           Command line (exists)
 ├── project/         Project files, decisions and masks
 ├── ingest/          RAW and JPEG loading, lens correction
-├── poses/           Camera positions through COLMAP
 ├── surface/         Verticals, facade surface, slope modes
 ├── foreground/      Parallax check, segmentation, tracking
 ├── seams/           Graph cut and local alignment
