@@ -13,3 +13,4 @@ new record that replaces it.
 | [0005](0005-tiles-and-memory-budgets.md) | Tiles and memory budgets | Accepted |
 | [0006](0006-code-and-model-licensing.md) | Code and model licensing | Accepted |
 | [0007](0007-on-demand-model-manager.md) | On-demand model manager | Accepted |
+| [0008](0008-fixed-focal-length.md) | Fixed focal length | Accepted |

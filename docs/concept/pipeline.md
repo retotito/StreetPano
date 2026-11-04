@@ -36,17 +36,31 @@ verticals are corrected. See [File formats](formats.md).
 Run structure-from-motion with COLMAP. Sequential matching suits a walk along a
 street, and it reduces false matches between similar-looking windows.
 
-!!! warning "Flat facades make pose estimation unstable"
-    A first test on a 21-photo synthetic street matched features correctly, with
-    94–97% of facade matches within 2 px of the true position. Even so, the direction
-    of travel estimated from two photos was unreliable because the scene is almost
-    flat. The median error ranged from 3° to 80° depending on the distance between
-    the photos, and the worst pair was 89° off. With rotation known, the error stayed
-    within 0.8°.
+!!! warning "Flat facades need special care"
+    Two photos alone aren't enough on a nearly flat scene. In a test on a synthetic
+    street, the direction of travel from two photos had a median error of 3° to 80°,
+    depending on the distance between them. COLMAP avoids this by optimising across
+    all photos together.
 
-    So the pipeline shouldn't rely on two-photo estimates. It should optimise across
-    many photos, and it should constrain rotation, for example using building
-    verticals. This test used OpenCV on simplified scenes. COLMAP hasn't been tested yet.
+    COLMAP also can't separate focal length from facade distance on such a scene, so
+    [focal length must stay fixed](../adr/0008-fixed-focal-length.md).
+
+Results from COLMAP with a fixed focal length, on 40 m synthetic streets at 1280 ×
+720 px with about 2 cm of hand-held wobble unless stated:
+
+| Condition | Rotation error, median | Position error, median | Facade (true 15 m) |
+|---|---:|---:|---:|
+| Flat street, 1 m spacing | 0.009° | 0.2 cm | 15.00 m |
+| 5% slope | 0.011° | 0.3 cm | 15.00 m |
+| Camera tilted up 10° | 0.006° | 0.2 cm | 15.00 m |
+| 8 cm of wobble | 0.014° | 0.4 cm | 15.00 m |
+| 3 m spacing | 0.030° | 0.9 cm | 14.99 m |
+| 5 m spacing | 0.021° | 0.9 cm | 15.00 m |
+| 8 m spacing | 0.079° | 2.3 cm | 15.00 m |
+
+These results are the best case. The scenes have perfect lenses, a known focal
+length and unique textures, without repeating windows or changing light. Real photos
+will be worse, and longer streets may drift.
 
 Long sequences can drift, so we expect to need priors such as GPS or a roughly
 straight path. VGGT is fast, but [pose reliability fell as image counts grew in an

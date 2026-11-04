@@ -27,6 +27,12 @@ This choice [needs a side-by-side test](../adr/0003-photos-as-main-capture.md).
 - Turn off auto HDR, in-camera lens correction and similar automatic adjustments.
 - Shoot RAW if possible. See [File formats](formats.md).
 
+## Keep the zoom fixed
+
+StreetPano needs the true focal length, so
+[every photo in a sequence must use the same zoom](../adr/0008-fixed-focal-length.md).
+Don't zoom during a walk, and on a phone, stay on one camera lens.
+
 ## How to walk
 
 - Stay at a steady distance from the facade.
@@ -60,6 +66,8 @@ A phone is a good way to try the workflow before committing to better equipment.
   This processing can vary between shots, which creates colour jumps at the seams.
 - **Hold the phone sideways,** so that each photo covers more of the street, unless
   you need upright framing to fit tall buildings. Keep the same orientation throughout.
+- **Avoid digital zoom and lens switching.** Some phones switch lenses by themselves,
+  so check that the photos all look the same width.
 - **Choose a straight, flat 100 m first,** with few parked cars. Save hills and
   curves for later.
 

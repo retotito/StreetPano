@@ -93,7 +93,7 @@ check again before adding a dependency.
 | [SAM 2](https://github.com/facebookresearch/sam2) | Apache-2.0 | |
 | [Depth Anything 3](https://github.com/ByteDance-Seed/Depth-Anything-3) | Varies by model | Small, Base and Metric-Large are Apache-2.0. Large, Giant and Nested are CC BY-NC 4.0. |
 | [Mask2Former](https://github.com/facebookresearch/Mask2Former) | MIT | Repository archived. Check the licence of the training data for pretrained weights. |
-| [COLMAP](https://github.com/colmap/colmap) | New BSD | Now includes the GLOMAP global mapper. Some dependencies are licensed separately. |
+| [COLMAP](https://github.com/colmap/colmap) | New BSD | In use through pycolmap, as an optional dependency. Now includes the GLOMAP global mapper. Some dependencies are licensed separately. |
 | [LightGlue](https://github.com/cvg/LightGlue) | Apache-2.0 | Feature extractors may have different terms. |
 | [VGGT](https://github.com/facebookresearch/vggt) | Custom | Only a specific checkpoint allows commercial use. |
 | [LaMa](https://github.com/advimman/lama) | Apache-2.0 | |

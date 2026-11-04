@@ -1,6 +1,7 @@
 """Command-line interface for StreetPano."""
 
 import argparse
+import json
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -9,6 +10,12 @@ from streetpano.geometry import (
     focal_length_px,
     ground_sample_distance_m,
     parallax_shift_px,
+)
+from streetpano.poses import (
+    PoseEstimationError,
+    compare_with_truth,
+    estimate_poses,
+    write_estimate,
 )
 from streetpano.sizing import (
     BYTES_PER_GB,
@@ -63,6 +70,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--exposure-jitter", type=float, default=0, help="brightness change, fraction"
     )
     synth.set_defaults(run=run_synth)
+
+    poses = commands.add_parser(
+        "poses", help="find camera positions from photos with COLMAP"
+    )
+    poses.add_argument("photos", type=Path, help="folder of photos")
+    poses.add_argument("output", type=Path, help="new or empty folder")
+    poses.add_argument(
+        "--focal-px", type=float, required=True, help="known focal length, px"
+    )
+    poses.add_argument(
+        "--truth", type=Path, help="scene.json of a synthetic street, to measure error"
+    )
+    poses.set_defaults(run=run_poses)
     return parser
 
 
@@ -110,12 +130,28 @@ def run_synth(args: argparse.Namespace) -> None:
     print(f"Wrote {scene.photo_count} photos to {args.output}")
 
 
+def run_poses(args: argparse.Namespace) -> None:
+    """Find camera positions, and measure them if the truth is known."""
+    estimate = estimate_poses(args.photos, args.output, args.focal_px)
+    write_estimate(estimate, args.output / "poses.json")
+    print(f"Registered {len(estimate.poses)} photos")
+    if estimate.missing:
+        print(f"Missing: {', '.join(estimate.missing)}")
+    print(f"Mean reprojection error: {estimate.mean_reprojection_error_px:.2f} px")
+    if args.truth is not None:
+        description = json.loads(args.truth.read_text(encoding="utf-8"))
+        report = compare_with_truth(estimate, description)
+        print(f"Rotation error:  {report.rotation_median_deg:.3f} deg median")
+        print(f"Position error:  {report.position_median_m * 100:.1f} cm median")
+        print(f"Facade distance: {report.facade_distance_m:.2f} m")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command-line interface and return its exit code."""
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
         args.run(args)
-    except (ValueError, FileExistsError) as error:
+    except (ValueError, FileExistsError, PoseEstimationError) as error:
         parser.error(str(error))
     return 0

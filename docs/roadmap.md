@@ -30,8 +30,9 @@ flowchart LR
 ## 2. Classic baseline, no AI
 
 - [ ] Load photos and correct lenses
-- [ ] Find camera positions with COLMAP, measured against synthetic streets
-- [ ] Constrain rotation, because [flat facades make pose estimation unstable](concept/pipeline.md#2-find-camera-positions)
+- [x] Find camera positions with COLMAP, measured against synthetic streets
+- [ ] Read focal length from photo metadata
+- [ ] Test camera positions on real photos
 - [ ] Correct verticals automatically and build the facade surface
 - [ ] Choose a [licence-compatible graph cut](concept/ai-models.md)
 - [ ] Choose seams, then blend

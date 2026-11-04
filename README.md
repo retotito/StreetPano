@@ -8,8 +8,8 @@ while walking along a street.
 
 > **Status: concept stage.** The design is documented, and the repository has
 > tests and CI, but the stitching pipeline does not exist yet. So far, only the
-> `streetpano estimate` planning command and the `streetpano synth` test-street
-> generator work.
+> `streetpano estimate` planning command, the `streetpano synth` test-street generator
+> and `streetpano poses` for finding camera positions work.
 
 ![Seams chosen by graph cut keep a car whole, while straight seams break it](docs/assets/seams.svg)
 
