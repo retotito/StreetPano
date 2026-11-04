@@ -16,6 +16,65 @@ classic baseline, and model weights are never stored in this repository.
 | Fill small gaps | LaMa | Quality needs testing |
 | Fill larger gaps | Diffusion inpainting, DiffuEraser | Quality needs testing |
 
+## Installing models
+
+!!! note "Planned"
+    This describes the design. The model manager doesn't exist yet. See the
+    [decision record](../adr/0007-on-demand-model-manager.md).
+
+The app works without any models, and downloads each one when a feature first needs
+it. Nothing is downloaded on the start screen.
+
+```mermaid
+flowchart TD
+    A[User clicks an AI feature] --> B{Model installed?}
+    B -- Yes --> F[Run the feature]
+    B -- No --> C[Show size, licence,<br/>and whether it fits this computer]
+    C --> D{User accepts?}
+    D -- No --> G[Offer manual tools instead]
+    D -- Yes --> E[Download and verify]
+    E --> F
+```
+
+For example, clicking an object for the first time would offer to download SAM 2.
+If the user declines, the lasso still works.
+
+### Model manager
+
+A screen in the app, and a matching command line, shows every model with:
+
+| Information | Why it matters |
+|---|---|
+| Purpose | Which feature needs it |
+| Download size and disk use | Disk space can be the tightest limit |
+| Memory needed, and whether it fits this computer | Some models won't run on 8 GB |
+| Licence | Some models are non-commercial only |
+| Status | Not installed, installed, or update available |
+
+Users can install, remove and update models there, and can choose where they're
+stored, such as an external SSD.
+
+```sh
+streetpano models list
+streetpano models install sam2-small
+streetpano models remove sam2-small
+```
+
+### Rules
+
+- **Licences are shown first.** A non-commercial model needs explicit acceptance
+  before it downloads.
+- **Downloads are verified.** The app uses a list of pinned versions and checksums,
+  and it refuses a file that doesn't match.
+- **Safe file formats are preferred.** Older PyTorch checkpoint files can run code
+  when loaded, so `safetensors` is preferred wherever a model offers it.
+- **Interrupted downloads resume.** Disk space is checked before a download starts.
+- **Offline use is supported.** A model file can be imported from disk.
+- **Updates are never automatic.** A new model version can change results, so each
+  project records the versions it used.
+- **Heavy models can run elsewhere.** A model that doesn't fit this computer can run
+  on a remote GPU, or the app suggests a smaller version.
+
 ## When training might make sense
 
 Only if testing shows a specific, repeated failure. The first option is

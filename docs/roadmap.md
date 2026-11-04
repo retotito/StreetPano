@@ -52,6 +52,7 @@ This tests the core idea, and the riskiest part of it, early.
 ## 4. Review tool
 
 - [ ] Tile viewer
+- [ ] [Model manager](concept/ai-models.md#installing-models), including download, verification and licences
 - [ ] Click to mark objects, and review suggestions
 - [ ] Manual vertical lines and seam corrections
 - [ ] Local updates
