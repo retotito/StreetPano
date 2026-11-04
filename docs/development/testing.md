@@ -27,7 +27,7 @@ uv run mkdocs build --strict
 | **Unit** | Individual calculations | In use |
 | **Property** | Rules that must always hold, such as "closer objects shift more" | In use |
 | **Documented figures** | The numbers quoted in these docs match the code | In use |
-| **Synthetic street** | End-to-end checks against known geometry | Planned |
+| **Synthetic street** | Checks against known geometry | Generator in use, end-to-end checks planned |
 | **Memory cap** | A long street stays within its memory budget | Planned |
 | **Visual regression** | Output compared with approved reference images | Planned |
 | **Real street** | Quality checks on real captures, run manually | Planned |
@@ -35,8 +35,29 @@ uv run mkdocs build --strict
 ## Synthetic streets
 
 A test scene with known camera positions, facade planes and foreground objects
-gives exact ground truth, needs no large downloads and can run in CI. It allows
-direct measurements:
+gives exact ground truth, needs no large downloads and can run in CI. To create one:
+
+```sh
+uv run streetpano synth my-street --length 30 --spacing 1 --seed 7
+```
+
+This writes a new folder containing:
+
+| Path | Contents |
+|---|---|
+| `photos/00000.png` | The rendered photos |
+| `truth/00000.npz` | Exact `labels` (sky, ground, building or object) and `depth_m` for every pixel |
+| `scene.json` | Camera positions, camera model and scene description |
+
+Options such as `--slope`, `--pitch`, `--roll`, `--wobble` and `--exposure-jitter` add
+capture problems on purpose. The renderer uses flat facades and box-shaped objects,
+without lens distortion, so passing on synthetic streets is necessary but not
+sufficient. Real photos are still needed.
+
+The tests confirm that rendered parallax and occlusion match the formulas in
+`streetpano.geometry`.
+
+Synthetic streets allow direct measurements:
 
 - Camera position error
 - Facade alignment error, in pixels

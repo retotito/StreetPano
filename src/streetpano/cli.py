@@ -2,6 +2,7 @@
 
 import argparse
 from collections.abc import Sequence
+from pathlib import Path
 
 from streetpano import __version__
 from streetpano.geometry import (
@@ -15,6 +16,7 @@ from streetpano.sizing import (
     panorama_width_px,
     photo_count,
 )
+from streetpano.synthetic import CameraSpec, default_scene, write_dataset
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -41,6 +43,26 @@ def build_parser() -> argparse.ArgumentParser:
     estimate.add_argument(
         "--object", type=float, default=5, help="to foreground object, m"
     )
+    estimate.set_defaults(run=run_estimate)
+
+    synth = commands.add_parser(
+        "synth", help="render a synthetic test street with exact ground truth"
+    )
+    synth.add_argument("output", type=Path, help="new or empty folder")
+    synth.add_argument("--length", type=float, default=30, help="street, m")
+    synth.add_argument("--spacing", type=float, default=1, help="between photos, m")
+    synth.add_argument("--seed", type=int, default=0, help="for a repeatable street")
+    synth.add_argument("--width", type=int, default=1280, help="photo, px")
+    synth.add_argument("--height", type=int, default=720, help="photo, px")
+    synth.add_argument("--camera-height", type=float, default=1.6, help="m")
+    synth.add_argument("--slope", type=float, default=0, help="0.05 means 5%%")
+    synth.add_argument("--pitch", type=float, default=0, help="camera tilt, degrees")
+    synth.add_argument("--roll", type=float, default=0, help="camera roll, degrees")
+    synth.add_argument("--wobble", type=float, default=0, help="hand-held path, m")
+    synth.add_argument(
+        "--exposure-jitter", type=float, default=0, help="brightness change, fraction"
+    )
+    synth.set_defaults(run=run_synth)
     return parser
 
 
@@ -65,12 +87,35 @@ def format_estimate(args: argparse.Namespace) -> str:
     )
 
 
+def run_estimate(args: argparse.Namespace) -> None:
+    """Print the capture estimate."""
+    print(format_estimate(args))
+
+
+def run_synth(args: argparse.Namespace) -> None:
+    """Render a synthetic street to a folder."""
+    scene = default_scene(
+        length_m=args.length,
+        spacing_m=args.spacing,
+        seed=args.seed,
+        camera=CameraSpec(width_px=args.width, height_px=args.height),
+        camera_height_m=args.camera_height,
+        slope=args.slope,
+        pitch_deg=args.pitch,
+        roll_deg=args.roll,
+        path_wobble_m=args.wobble,
+        exposure_jitter=args.exposure_jitter,
+    )
+    write_dataset(scene, args.output)
+    print(f"Wrote {scene.photo_count} photos to {args.output}")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command-line interface and return its exit code."""
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        print(format_estimate(args))
-    except ValueError as error:
+        args.run(args)
+    except (ValueError, FileExistsError) as error:
         parser.error(str(error))
     return 0

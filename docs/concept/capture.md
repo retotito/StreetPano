@@ -42,6 +42,31 @@ This choice [needs a side-by-side test](../adr/0003-photos-as-main-capture.md).
 - Consider two passes at different times, because parked cars and people may have
   moved between them.
 
+## First test with a smartphone
+
+A phone is a good way to try the workflow before committing to better equipment.
+
+- **Use the main camera.** The ultrawide usually has far less detail and more
+  distortion. Avoid digital zoom.
+- **Use the default resolution.** Phones with a 50 MP sensor usually combine pixels
+  into a roughly 12 MP photo, which tends to have less noise.
+- **Shoot photos as well as video.** Many budget phones stop at 1080p video, which
+  has about half the detail of a 12 MP photo. The video is still useful for comparison.
+- **Lock everything you can.** The open-source
+  [Open Camera](https://opencamera.org.uk/) app has an auto-repeat mode with a set
+  delay, exposure lock and, through its Camera2 setting, manual white balance. What
+  works depends on the phone, so try it at home first.
+- **Turn off automatic processing,** such as AI scene modes, HDR and beauty filters.
+  This processing can vary between shots, which creates colour jumps at the seams.
+- **Hold the phone sideways,** so that each photo covers more of the street, unless
+  you need upright framing to fit tall buildings. Keep the same orientation throughout.
+- **Choose a straight, flat 100 m first,** with few parked cars. Save hills and
+  curves for later.
+
+If a lens can't fit a whole building in the frame, don't walk further from it,
+because the street width limits that. Shoot closer together, or walk the street
+twice with the camera tilted to a different height.
+
 ## Parked cars: use a higher camera
 
 A row of parked cars hides the lower facade from every position along the street,

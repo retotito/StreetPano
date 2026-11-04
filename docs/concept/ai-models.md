@@ -52,6 +52,8 @@ check again before adding a dependency.
 | [LibRaw](https://github.com/LibRaw/LibRaw) | LGPL-2.1 or CDDL-1.0 | |
 | [rawpy](https://github.com/letmaik/rawpy) | MIT | |
 | [Lensfun](https://github.com/lensfun/lensfun) | LGPL-3.0 | |
+| [NumPy](https://github.com/numpy/numpy) | BSD-3-Clause | In use |
+| [Pillow](https://github.com/python-pillow/Pillow) | MIT-CMU | In use |
 | [PyMaxflow](https://github.com/pmneila/PyMaxflow) | **GPL** | **Avoid as a required dependency.** See below. |
 
 ## Open question: graph-cut library

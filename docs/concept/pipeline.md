@@ -36,6 +36,18 @@ verticals are corrected. See [File formats](formats.md).
 Run structure-from-motion with COLMAP. Sequential matching suits a walk along a
 street, and it reduces false matches between similar-looking windows.
 
+!!! warning "Flat facades make pose estimation unstable"
+    A first test on a 21-photo synthetic street matched features correctly, with
+    94–97% of facade matches within 2 px of the true position. Even so, the direction
+    of travel estimated from two photos was unreliable because the scene is almost
+    flat. The median error ranged from 3° to 80° depending on the distance between
+    the photos, and the worst pair was 89° off. With rotation known, the error stayed
+    within 0.8°.
+
+    So the pipeline shouldn't rely on two-photo estimates. It should optimise across
+    many photos, and it should constrain rotation, for example using building
+    verticals. This test used OpenCV on simplified scenes. COLMAP hasn't been tested yet.
+
 Long sequences can drift, so we expect to need priors such as GPS or a roughly
 straight path. VGGT is fast, but [pose reliability fell as image counts grew in an
 aerial benchmark](https://arxiv.org/abs/2507.14798), so it's a candidate only for

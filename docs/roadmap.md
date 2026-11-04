@@ -22,7 +22,7 @@ flowchart LR
 ## 1. Test data
 
 - [ ] Shoot the same 100 m of street as both photos and video
-- [ ] Build a generator for synthetic test streets
+- [x] Build a generator for synthetic test streets
 - [ ] Decide between [photos and video](adr/0003-photos-as-main-capture.md)
 
 **Done when:** the capture method is chosen based on real results.
@@ -30,7 +30,8 @@ flowchart LR
 ## 2. Classic baseline, no AI
 
 - [ ] Load photos and correct lenses
-- [ ] Find camera positions with COLMAP
+- [ ] Find camera positions with COLMAP, measured against synthetic streets
+- [ ] Constrain rotation, because [flat facades make pose estimation unstable](concept/pipeline.md#2-find-camera-positions)
 - [ ] Correct verticals automatically and build the facade surface
 - [ ] Choose a [licence-compatible graph cut](concept/ai-models.md)
 - [ ] Choose seams, then blend
