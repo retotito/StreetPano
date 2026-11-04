@@ -35,6 +35,11 @@ alarms. Suppressing them could have hidden real bugs too, so `ImageLoader` uses 
 threads and a standard mutex instead, and Qt only delivers a signal that results are
 ready. Follow this pattern for new background work.
 
+On Linux, ThreadSanitizer still reports memory calls made inside Qt's own libraries.
+`tests/sanitizers/tsan.supp` ignores only those calls, while accesses from StreetPano's
+code stay checked. The Mac run needs no suppressions. Don't suppress anything outside
+system libraries.
+
 ## Test levels
 
 | Level | Purpose | Status |

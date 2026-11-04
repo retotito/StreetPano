@@ -12,6 +12,16 @@ using streetpano::ui::FilmStripDelegate;
 using streetpano::ui::MainWindow;
 using streetpano::ui::PhotoListModel;
 
+namespace {
+
+// Returns an invalid colour until a photo is showing.
+QColor shownColor(const MainWindow& window) {
+    const QImage& image = window.photoView()->image();
+    return image.isNull() ? QColor() : image.pixelColor(1, 1);
+}
+
+}  // namespace
+
 class MainWindowTest : public QObject {
     Q_OBJECT
 
@@ -50,7 +60,7 @@ void MainWindowTest::opensAFolderAndShowsTheFirstPhoto() {
     QCOMPARE(window.photoCount(), 2);
     QCOMPARE(window.currentPhoto(), 0);
     QTRY_VERIFY(!window.photoView()->image().isNull());
-    QCOMPARE(window.photoView()->image().pixelColor(1, 1), QColor(Qt::red));
+    QCOMPARE(shownColor(window), QColor(Qt::red));
     QCOMPARE(window.positionText(), QStringLiteral("Photo 1 of 2: img2.png"));
 }
 
@@ -63,13 +73,13 @@ void MainWindowTest::movesThroughPhotos() {
     window.openFolder(folder.path());
     window.selectPhoto(2);
     QCOMPARE(window.currentPhoto(), 2);
-    QTRY_COMPARE(window.photoView()->image().pixelColor(1, 1), QColor(Qt::blue));
+    QTRY_COMPARE(shownColor(window), QColor(Qt::blue));
     window.selectPhoto(1);
-    QTRY_COMPARE(window.photoView()->image().pixelColor(1, 1), QColor(Qt::green));
+    QTRY_COMPARE(shownColor(window), QColor(Qt::green));
     // Going back to a photo that's still cached shows it straight away.
     QTRY_VERIFY(window.previewCacheUsedBytes() > 0);
     window.selectPhoto(2);
-    QCOMPARE(window.photoView()->image().pixelColor(1, 1), QColor(Qt::blue));
+    QCOMPARE(shownColor(window), QColor(Qt::blue));
 }
 
 void MainWindowTest::ignoresPositionsOutsideTheStreet() {
@@ -127,7 +137,7 @@ void MainWindowTest::showsAnErrorForADamagedPhoto() {
 
     // The rest of the street still works.
     window.selectPhoto(1);
-    QTRY_COMPARE(window.photoView()->image().pixelColor(1, 1), QColor(Qt::green));
+    QTRY_COMPARE(shownColor(window), QColor(Qt::green));
 }
 
 void MainWindowTest::aNewFolderReplacesResultsFromTheOldOne() {
@@ -143,7 +153,7 @@ void MainWindowTest::aNewFolderReplacesResultsFromTheOldOne() {
     window.openFolder(second.path());
     QTRY_VERIFY(!window.photoView()->image().isNull());
     QTest::qWait(200);
-    QCOMPARE(window.photoView()->image().pixelColor(1, 1), QColor(Qt::green));
+    QCOMPARE(shownColor(window), QColor(Qt::green));
     QCOMPARE(window.photoCount(), 1);
 }
 

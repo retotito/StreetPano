@@ -1,1 +1,7 @@
-# Add entries only for problems inside system libraries, and explain each one.
+# Qt's Linux packages aren't built with ThreadSanitizer, so it can't see the locks inside
+# them. It then reports memory calls made by Qt itself, such as its event queue, as races.
+# These rules cover only memory calls made directly from these libraries. Accesses from
+# StreetPano's own code are still checked. Add entries only for system libraries.
+called_from_lib:libQt6Core.so
+called_from_lib:libQt6Gui.so
+called_from_lib:libQt6Widgets.so
