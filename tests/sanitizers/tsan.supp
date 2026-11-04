@@ -5,3 +5,5 @@
 called_from_lib:libQt6Core.so
 called_from_lib:libQt6Gui.so
 called_from_lib:libQt6Widgets.so
+# Qt Test runs a watchdog thread of its own, which is part of the test tool, not the app.
+called_from_lib:libQt6Test.so
