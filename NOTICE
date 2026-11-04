@@ -2,5 +2,6 @@ StreetPano
 Copyright 2026 Reto Küpfer
 
 This product is licensed under the Apache License, Version 2.0.
+This product uses the Qt Toolkit under the LGPL-3.0, linked dynamically.
 Third-party models and libraries keep their own licences.
 See docs/concept/ai-models.md.

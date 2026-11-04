@@ -1,0 +1,4 @@
+# Leaks inside system libraries that StreetPano doesn't control.
+leak:libfontconfig
+leak:libglib
+leak:libdbus

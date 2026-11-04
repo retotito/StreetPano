@@ -3,7 +3,9 @@
 No custom training is planned. Existing models cover each job, and the real work is
 the pipeline, seam logic and review tool.
 
-All models sit behind replaceable interfaces. None of them is required for the
+Models run through ONNX Runtime wherever they can be converted. A model that can't be
+converted can use an optional Python helper process instead. All models sit behind
+replaceable interfaces. None of them is required for the
 classic baseline, and model weights are never stored in this repository.
 
 | Job | Candidate | Status |
@@ -55,9 +57,9 @@ Users can install, remove and update models there, and can choose where they're
 stored, such as an external SSD.
 
 ```sh
-streetpano models list
-streetpano models install sam2-small
-streetpano models remove sam2-small
+StreetPano --models list
+StreetPano --models install sam2-small
+StreetPano --models remove sam2-small
 ```
 
 ### Rules
@@ -66,8 +68,8 @@ streetpano models remove sam2-small
   before it downloads.
 - **Downloads are verified.** The app uses a list of pinned versions and checksums,
   and it refuses a file that doesn't match.
-- **Safe file formats are preferred.** Older PyTorch checkpoint files can run code
-  when loaded, so `safetensors` is preferred wherever a model offers it.
+- **Safe file formats are required in the app.** ONNX files don't run code when loaded.
+  Older PyTorch checkpoints can, so the optional helper prefers `safetensors`.
 - **Interrupted downloads resume.** Disk space is checked before a download starts.
 - **Offline use is supported.** A model file can be imported from disk.
 - **Updates are never automatic.** A new model version can change results, so each
@@ -93,7 +95,7 @@ check again before adding a dependency.
 | [SAM 2](https://github.com/facebookresearch/sam2) | Apache-2.0 | |
 | [Depth Anything 3](https://github.com/ByteDance-Seed/Depth-Anything-3) | Varies by model | Small, Base and Metric-Large are Apache-2.0. Large, Giant and Nested are CC BY-NC 4.0. |
 | [Mask2Former](https://github.com/facebookresearch/Mask2Former) | MIT | Repository archived. Check the licence of the training data for pretrained weights. |
-| [COLMAP](https://github.com/colmap/colmap) | New BSD | In use through pycolmap, as an optional dependency. Now includes the GLOMAP global mapper. Some dependencies are licensed separately. |
+| [COLMAP](https://github.com/colmap/colmap) | New BSD | In use through pycolmap, in developer tools only so far. Now includes the GLOMAP global mapper. Some dependencies are licensed separately. |
 | [LightGlue](https://github.com/cvg/LightGlue) | Apache-2.0 | Feature extractors may have different terms. |
 | [VGGT](https://github.com/facebookresearch/vggt) | Custom | Only a specific checkpoint allows commercial use. |
 | [LaMa](https://github.com/advimman/lama) | Apache-2.0 | |
@@ -106,13 +108,14 @@ check again before adding a dependency.
 
 | Project | Licence | Notes |
 |---|---|---|
-| [OpenSeadragon](https://github.com/openseadragon/openseadragon) | BSD-3-Clause | |
+| [Qt 6](https://www.qt.io/licensing/open-source-lgpl-obligations) | LGPL-3.0 | In use, dynamically linked. Use only modules available under the LGPL. |
+| [Catch2](https://github.com/catchorg/Catch2) | BSL-1.0 | In use, for tests only. |
 | [libvips](https://github.com/libvips/libvips) | LGPL-2.1 | |
 | [LibRaw](https://github.com/LibRaw/LibRaw) | LGPL-2.1 or CDDL-1.0 | |
 | [rawpy](https://github.com/letmaik/rawpy) | MIT | |
 | [Lensfun](https://github.com/lensfun/lensfun) | LGPL-3.0 | |
-| [NumPy](https://github.com/numpy/numpy) | BSD-3-Clause | In use |
-| [Pillow](https://github.com/python-pillow/Pillow) | MIT-CMU | In use |
+| [NumPy](https://github.com/numpy/numpy) | BSD-3-Clause | In use, in developer tools only. |
+| [Pillow](https://github.com/python-pillow/Pillow) | MIT-CMU | In use, in developer tools only. |
 | [PyMaxflow](https://github.com/pmneila/PyMaxflow) | **GPL** | **Avoid as a required dependency.** See below. |
 
 ## Open question: graph-cut library
@@ -121,7 +124,7 @@ PyMaxflow is GPL, which conflicts with the plan to distribute StreetPano under
 Apache-2.0 if it's a required dependency. Options to evaluate:
 
 1. OpenCV's graph-cut seam finder, which only handles pairs of images.
-2. Our own max-flow implementation in Rust, which isn't a large algorithm.
-3. PyMaxflow as an optional research-only dependency, to compare results.
+2. Our own max-flow implementation in C++, which isn't a large algorithm.
+3. PyMaxflow as a research-only developer tool, to compare results.
 
 See the [licensing decision record](../adr/0006-code-and-model-licensing.md).

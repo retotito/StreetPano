@@ -11,19 +11,30 @@ repos:
         exclude: \.md$
   - repo: local
     hooks:
+      - id: clang-format
+        name: clang-format
+        entry: uv run --project tools clang-format -i
+        language: system
+        types_or: [c++]
+      - id: cpp-rules
+        name: C++ memory rules
+        entry: uv run --project tools python -m streetpano.cpp_rules .
+        language: system
+        types_or: [c++]
+        pass_filenames: false
       - id: ruff-format
         name: ruff format
-        entry: uv run ruff format
+        entry: uv run --project tools ruff format
         language: system
         types: [python]
       - id: ruff-check
         name: ruff check
-        entry: uv run ruff check --fix
+        entry: uv run --project tools ruff check --fix
         language: system
         types: [python]
       - id: mypy
         name: mypy
-        entry: uv run mypy
+        entry: uv run --project tools --directory tools mypy
         language: system
         types: [python]
         pass_filenames: false

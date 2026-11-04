@@ -2,31 +2,48 @@
 
 ## What runs automatically
 
-Every push and pull request runs these checks on Linux and macOS, with Python 3.12
-and 3.13:
+Every push and pull request runs these checks:
 
-| Check | Tool |
-|---|---|
-| Formatting and lint | Ruff |
-| Strict type checks | mypy |
-| Tests, with at least 95% coverage | pytest, pytest-cov, Hypothesis |
-| Documentation builds with no broken links | MkDocs in strict mode |
+| Check | Tools | Where |
+|---|---|---|
+| Build and tests, with warnings as errors | CMake, Catch2, Qt Test | Linux (GCC, Clang), macOS, Windows |
+| Memory errors, leaks and undefined behaviour | AddressSanitizer, LeakSanitizer, UndefinedBehaviorSanitizer | Linux |
+| Thread errors | ThreadSanitizer | Linux |
+| Static analysis | clang-tidy | Linux |
+| C++ coverage, at least 85% of lines | gcovr | Linux |
+| C++ memory rules and formatting | `cpp_rules`, clang-format | Linux |
+| Python tools, with at least 95% coverage | Ruff, mypy, pytest, Hypothesis | Linux, macOS |
+| Documentation with no broken links | MkDocs in strict mode | Linux |
 
-Run them locally:
+Run the main ones locally:
 
 ```sh
-uv run pre-commit run --all-files
-uv run pytest
-uv run mkdocs build --strict
+cmake --preset dev && cmake --build --preset dev && ctest --preset dev
+cmake --preset asan && cmake --build --preset asan && ctest --preset asan
+cmake --preset tsan && cmake --build --preset tsan && ctest --preset tsan
+uv run --project tools pre-commit run --all-files
+uv run --project tools mkdocs build --strict
 ```
+
+LeakSanitizer doesn't run on Apple Silicon, so leaks are checked in the Linux job.
+
+## Keeping threads checkable
+
+ThreadSanitizer can't see inside Qt's precompiled libraries. When work passed through
+Qt's thread pool and event queue, it reported data races that were probably false
+alarms. Suppressing them could have hidden real bugs too, so `ImageLoader` uses standard
+threads and a standard mutex instead, and Qt only delivers a signal that results are
+ready. Follow this pattern for new background work.
 
 ## Test levels
 
 | Level | Purpose | Status |
 |---|---|---|
-| **Unit** | Individual calculations | In use |
+| **Unit** | Individual calculations and classes | In use |
 | **Property** | Rules that must always hold, such as "closer objects shift more" | In use |
 | **Documented figures** | The numbers quoted in these docs match the code | In use |
+| **Damaged files** | Empty, truncated, random and oversized images fail safely | In use |
+| **Screen tests** | Real windows without a display, including checks of drawn pixels | In use |
 | **Synthetic street** | Checks against known geometry | Generator in use, end-to-end checks planned |
 | **Memory cap** | A long street stays within its memory budget | Planned |
 | **Visual regression** | Output compared with approved reference images | Planned |
@@ -38,7 +55,7 @@ A test scene with known camera positions, facade planes and foreground objects
 gives exact ground truth, needs no large downloads and can run in CI. To create one:
 
 ```sh
-uv run streetpano synth my-street --length 30 --spacing 1 --seed 7
+uv run --project tools streetpano synth my-street --length 30 --spacing 1 --seed 7
 ```
 
 This writes a new folder containing:
@@ -59,7 +76,7 @@ The tests confirm that rendered parallax and occlusion match the formulas in
 that makes them worse fails the tests. To measure a street yourself:
 
 ```sh
-uv run streetpano poses my-street/photos my-street-poses \
+uv run --project tools streetpano poses my-street/photos my-street-poses \
   --focal-px 853.333 --truth my-street/scene.json
 ```
 

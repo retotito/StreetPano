@@ -6,7 +6,7 @@ new record that replaces it.
 
 | Record | Decision | Status |
 |---|---|---|
-| [0001](0001-python-first-rust-for-slow-parts.md) | Python first, Rust for slow parts | Accepted |
+| [0001](0001-python-first-rust-for-slow-parts.md) | Python first, Rust for slow parts | Replaced by 0010 |
 | [0002](0002-geometry-first-ai-assists.md) | Geometry first, AI assists | Accepted |
 | [0003](0003-photos-as-main-capture.md) | Photos as the main capture | Proposed |
 | [0004](0004-non-destructive-project-model.md) | Non-destructive project model | Accepted |
@@ -14,4 +14,5 @@ new record that replaces it.
 | [0006](0006-code-and-model-licensing.md) | Code and model licensing | Accepted |
 | [0007](0007-on-demand-model-manager.md) | On-demand model manager | Accepted |
 | [0008](0008-fixed-focal-length.md) | Fixed focal length | Accepted |
-| [0009](0009-web-ui-stack.md) | Svelte and FastAPI for the interface | Accepted |
+| [0009](0009-web-ui-stack.md) | Svelte and FastAPI for the interface | Replaced by 0010 |
+| [0010](0010-cpp-and-qt.md) | C++ and Qt for the application | Accepted |

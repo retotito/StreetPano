@@ -18,6 +18,8 @@ flowchart LR
 - [x] Repository, CI, tests and documentation
 - [x] Concept and decision records
 - [x] Planning calculations
+- [x] C++ and Qt project, with memory checks in CI
+- [x] First window: open a folder, film strip and photo view
 
 ## 1. Test data
 
@@ -30,7 +32,9 @@ flowchart LR
 ## 2. Classic baseline, no AI
 
 - [ ] Load photos and correct lenses
-- [x] Find camera positions with COLMAP, measured against synthetic streets
+- [x] Find camera positions with COLMAP, measured against synthetic streets, using a
+  Python tool
+- [ ] Find camera positions from the app, in C++
 - [ ] Read focal length from photo metadata
 - [ ] Test camera positions on real photos
 - [ ] Correct verticals automatically and build the facade surface
@@ -54,8 +58,9 @@ This tests the core idea, and the riskiest part of it, early.
 
 See the [planned workflow](concept/ui-workflow.md).
 
-- [ ] Projects, import and preview screens
-- [ ] Tile viewer
+- [x] First preview screen
+- [ ] Projects and import screens
+- [ ] GPU tile viewer
 - [ ] [Model manager](concept/ai-models.md#installing-models), including download, verification and licences
 - [ ] Click to mark objects, and review suggestions
 - [ ] Manual vertical lines and seam corrections

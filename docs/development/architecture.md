@@ -1,22 +1,19 @@
 # Architecture
 
 !!! note
-    This is the planned structure. Today, the package contains only `geometry`,
-    `sizing`, `synthetic`, `poses` and `cli`.
+    Most of this is planned. Today, the app contains `core/lru_cache`,
+    `core/photo_listing` and a first Qt window. See the [roadmap](../roadmap.md).
 
 ## Components
 
 ```mermaid
 flowchart TB
-    subgraph UI[Review tool]
-        V[Web viewer<br/>OpenSeadragon]
+    subgraph UI[Screens, ui library]
+        W[Qt windows]
+        V[GPU panorama view]
     end
-    subgraph APP[Application]
-        API[Local API<br/>FastAPI]
-        CLI[Command line]
-        Q[Job queue and<br/>memory budget]
-    end
-    subgraph CORE[Pipeline]
+    subgraph CORE[Pipeline, core library]
+        Q[Job queue and memory budget]
         P[Project model]
         G[Geometry]
         S[Seams]
@@ -24,12 +21,11 @@ flowchart TB
     end
     subgraph EXT[Replaceable backends]
         SFM[COLMAP]
-        AI[AI models]
+        AI[ONNX Runtime]
         IMG[LibRaw and libvips]
     end
-    V --> API
-    API --> Q
-    CLI --> Q
+    W --> Q
+    V --> R
     Q --> P
     Q --> G
     Q --> S
@@ -39,35 +35,50 @@ flowchart TB
     R --> IMG
 ```
 
+The `core` library doesn't depend on Qt, so that it stays fast to test and can run
+without a screen.
+
 ## Stack
 
 | Area | Choice | Reason |
 |---|---|---|
-| Pipeline | Python, PyTorch, OpenCV, pyvips | Most vision and AI tooling is built for it |
-| Slow parts | Rust through PyO3, only after profiling | Fast and memory-safe |
-| User interface | Local web app with Svelte, FastAPI and OpenSeadragon, and possibly Tauri later | [Deep-zoom viewing already exists](../adr/0009-web-ui-stack.md) |
-| Environment | uv | Fast, with a reproducible lockfile |
+| Language | C++20 | Performance, and direct use of the main libraries |
+| Screens | Qt 6 Widgets | Proven in image software, and runs on Mac, Windows and Linux |
+| Build | CMake with presets, and Ninja | The standard for C++ with Qt |
+| Tests | Catch2 for `core`, Qt Test for screens | Qt Test can run real windows without a display |
+| Developer tools | Python, managed with uv | Synthetic streets and accuracy measurement |
 
-See the [decision record](../adr/0001-python-first-rust-for-slow-parts.md).
+See the [decision record](../adr/0010-cpp-and-qt.md).
 
-## Planned package layout
+## Repository layout
 
 ```text
-src/streetpano/
-├── geometry.py      Capture geometry (exists)
-├── sizing.py        Size estimates (exists)
-├── synthetic.py     Test streets with exact ground truth (exists)
-├── poses.py         Camera positions through COLMAP (exists)
-├── cli.py           Command line (exists)
+app/                 Program entry point
+src/core/            Pipeline, with no Qt
+src/ui/              Qt screens
+tests/core/          Catch2 tests
+tests/ui/            Qt Test screen tests
+tests/sanitizers/    Rules for problems inside system libraries
+scripts/dev.sh       Builds and opens the app
+tools/               Python developer tools
+docs/                This documentation
+```
+
+## Planned `core` layout
+
+```text
+src/core/
+├── lru_cache        Memory-budgeted cache (exists)
+├── photo_listing    Finding photos in a folder (exists)
 ├── project/         Project files, decisions and masks
 ├── ingest/          RAW and JPEG loading, lens correction
+├── poses/           Camera positions through COLMAP
 ├── surface/         Verticals, facade surface, slope modes
 ├── foreground/      Parallax check, segmentation, tracking
 ├── seams/           Graph cut and local alignment
 ├── render/          Blending, tiles and export
 ├── jobs/            Job queue and memory budget
-├── models/          Model list, downloads and verification
-└── server/          Local API for the review tool
+└── models/          Model list, downloads and verification
 ```
 
 ## Project on disk
@@ -85,8 +96,25 @@ my-street.streetpano/
 └── exports/         Finished panoramas
 ```
 
+## Memory and thread rules
+
+These are mandatory, and CI enforces as much as it can:
+
+- **Ownership is automatic.** Use containers, `std::unique_ptr` and RAII. Qt objects
+  are created with `makeChild`, which gives them a parent to own them. Plain `new`,
+  `delete` and C allocation are forbidden elsewhere.
+- **One owner per cache.** A cache belongs to one thread. Other threads pass it results
+  by message.
+- **Workers get copies.** Background work receives its own inputs, and it shares only
+  mutex-guarded queues with the owner.
+- **Destructors wait.** An object that owns workers joins them in its destructor, so a
+  result can't reach an object that no longer exists.
+- **Memory is budgeted.** Anything that holds images has a size limit, and a test
+  enforces it.
+
 ## Rules for dependencies
 
-- Core logic must not import a specific AI model. Models sit behind interfaces.
+- Core logic must not depend on a specific AI model. Models sit behind interfaces.
 - `project.json` carries a format version, and older versions must keep loading.
 - Non-commercial models and weights are never required, and are never included.
+- Qt is linked dynamically, using only modules available under the LGPL.

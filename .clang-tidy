@@ -1,0 +1,17 @@
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  clang-analyzer-*,
+  concurrency-mt-unsafe,
+  cppcoreguidelines-slicing,
+  cppcoreguidelines-special-member-functions,
+  misc-unused-parameters,
+  modernize-use-nullptr,
+  modernize-use-override,
+  performance-*,
+  -performance-enum-size,
+  readability-container-size-empty,
+  readability-make-member-function-const,
+WarningsAsErrors: "*"
+HeaderFilterRegex: "(src|app)/.*\\.hpp$"
