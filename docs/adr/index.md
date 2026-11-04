@@ -11,4 +11,4 @@ new record that replaces it.
 | [0003](0003-photos-as-main-capture.md) | Photos as the main capture | Proposed |
 | [0004](0004-non-destructive-project-model.md) | Non-destructive project model | Accepted |
 | [0005](0005-tiles-and-memory-budgets.md) | Tiles and memory budgets | Accepted |
-| [0006](0006-code-and-model-licensing.md) | Code and model licensing | Proposed |
+| [0006](0006-code-and-model-licensing.md) | Code and model licensing | Accepted |

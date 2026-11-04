@@ -2,7 +2,7 @@
 
 !!! note
     This is the planned structure. Today, the package contains only `geometry`,
-    `sizing` and `cli`.
+    `sizing`, `synthetic` and `cli`.
 
 ## Components
 
@@ -56,6 +56,7 @@ See the [decision record](../adr/0001-python-first-rust-for-slow-parts.md).
 src/streetpano/
 ├── geometry.py      Capture geometry (exists)
 ├── sizing.py        Size estimates (exists)
+├── synthetic.py     Test streets with exact ground truth (exists)
 ├── cli.py           Command line (exists)
 ├── project/         Project files, decisions and masks
 ├── ingest/          RAW and JPEG loading, lens correction

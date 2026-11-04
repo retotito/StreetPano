@@ -10,4 +10,5 @@ All notable changes are documented here. The format follows
 
 - Concept documentation, diagrams and decision records
 - `streetpano estimate` command for capture planning
+- `streetpano synth` command for test streets with exact ground truth
 - Automated tests, type checks, linting and CI

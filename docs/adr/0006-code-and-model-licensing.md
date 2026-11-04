@@ -1,6 +1,6 @@
 # 0006: Code and model licensing
 
-**Status:** Proposed. The project owner has yet to confirm the licence.
+**Status:** Accepted
 
 ## Context
 
@@ -17,9 +17,9 @@ Some useful libraries are GPL, such as PyMaxflow.
 
 ## Consequences
 
-- Others can reuse the code freely, including commercially. Choose a copyleft or
-  non-commercial licence instead if that isn't wanted. Note that a non-commercial
-  restriction would mean the project no longer meets the usual definition of open
-  source.
+- Others can reuse the code freely, including commercially. This was accepted in
+  exchange for a simple licence that doesn't deter contributors or reuse. A
+  non-commercial restriction would mean the project no longer meets the usual
+  definition of open source.
 - A graph-cut implementation with a compatible licence is needed.
 - Users of non-commercial models must follow those models' terms themselves.
