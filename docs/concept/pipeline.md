@@ -76,7 +76,7 @@ Results from COLMAP with a fixed focal length, on 40 m synthetic streets at 1280
 
 COLMAP's default settings are made for unordered photo collections. Limiting images to
 2000 px and 5000 features, and matching only the 8 nearest photos, took 16 photos of 12 MP
-from 500 s to under 10 s on an 8 GB laptop, with no loss of accuracy.
+from 417 s to 9.5 s on an 8 GB laptop, with the same accuracy on a synthetic street.
 
 These results are the best case. The scenes have perfect lenses, a known focal
 length and unique textures, without repeating windows or changing light. Real photos

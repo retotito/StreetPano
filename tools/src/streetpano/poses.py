@@ -33,8 +33,8 @@ _MAX_POINTS_IN_FILE = 20000
 
 # COLMAP's defaults are made for unordered photo collections. Photos taken along a
 # street only need to match their neighbours. These settings took 16 photos of 12 MP
-# from 500 s to under 10 s on an 8 GB laptop, with no loss of accuracy on synthetic
-# streets. They sit above the lowest values that worked, because real facades are
+# from 417 s to 9.5 s on an 8 GB laptop, with the same accuracy on a synthetic
+# street. They sit above the lowest values that worked, because real facades are
 # harder to match.
 _MAX_IMAGE_SIZE_PX = 2000
 _MAX_FEATURES = 5000
