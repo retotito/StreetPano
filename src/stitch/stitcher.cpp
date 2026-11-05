@@ -213,6 +213,9 @@ QImage withPatches(const StitchResult& stitched, const QDir& photoFolder,
         std::max(2, static_cast<int>(std::ceil(stitched.photoSize.width() * stitched.scale))),
         std::max(2, static_cast<int>(std::ceil(stitched.photoSize.height() * stitched.scale))));
     for (const core::Patch& patch : patches) {
+        if (patch.photo.empty()) {
+            continue;
+        }
         const auto pose = std::find_if(
             stitched.poses.begin(), stitched.poses.end(),
             [&patch](const core::CameraPose& item) { return item.name == patch.photo; });
@@ -233,6 +236,69 @@ QImage withPatches(const StitchResult& stitched, const QDir& photoFolder,
                         view, featherPixels);
     }
     return canvas;
+}
+
+std::optional<std::string> cleanestPhoto(const StitchResult& stitched, const QDir& photoFolder,
+                                         std::span<const core::WallPoint> outline) {
+    constexpr std::size_t kMaxPhotos = 8;
+    constexpr double kComparedPixels = 160.0;
+    std::vector<std::size_t> choices =
+        core::patchChoices(stitched.surface, stitched.poses, outline, stitched.focalPixels,
+                           stitched.photoSize.width(), stitched.photoSize.height());
+    if (choices.size() > kMaxPhotos) {
+        choices.resize(kMaxPhotos);
+    }
+    double left = outline.front().arc;
+    double right = left;
+    double top = outline.front().height;
+    double bottom = top;
+    for (const core::WallPoint& point : outline) {
+        left = std::min(left, point.arc);
+        right = std::max(right, point.arc);
+        top = std::max(top, point.height);
+        bottom = std::min(bottom, point.height);
+    }
+    // A small, coarse version of the area is enough to compare photos.
+    core::StitchPlan coarse = stitched.plan;
+    coarse.unitsPerPixel = std::max(right - left, top - bottom) / kComparedPixels;
+    if (coarse.unitsPerPixel <= 0.0) {
+        return std::nullopt;
+    }
+    coarse.leftArc = left;
+    coarse.topHeight = top;
+    const int width =
+        std::max(1, static_cast<int>(std::ceil((right - left) / coarse.unitsPerPixel)));
+    const int height =
+        std::max(1, static_cast<int>(std::ceil((top - bottom) / coarse.unitsPerPixel)));
+    const double shrink =
+        std::min(1.0, kMatchingPhotoWidth / static_cast<double>(stitched.photoSize.width()));
+    const QSize size(std::max(2, static_cast<int>(stitched.photoSize.width() * shrink)),
+                     std::max(2, static_cast<int>(stitched.photoSize.height() * shrink)));
+    const double focal =
+        stitched.focalPixels * size.width() / static_cast<double>(stitched.photoSize.width());
+
+    std::vector<std::vector<std::uint32_t>> pixels;
+    std::vector<std::size_t> cameras;
+    pixels.reserve(choices.size());
+    for (const std::size_t camera : choices) {
+        const QImage photo = readAtSize(photoFolder, stitched.poses[camera], size);
+        if (!photo.isNull()) {
+            pixels.push_back(core::projectPhoto(stitched.surface, coarse, stitched.poses[camera],
+                                                focal, viewOf(photo), 0, width, 0, height));
+            cameras.push_back(camera);
+        }
+    }
+    std::vector<core::ImageView> regions;
+    regions.reserve(pixels.size());
+    for (const std::vector<std::uint32_t>& region : pixels) {
+        regions.push_back(core::ImageView{region.data(), width, height,
+                                          static_cast<std::size_t>(width) * sizeof(std::uint32_t)});
+    }
+    const std::optional<std::size_t> best = core::cleanestRegion(regions);
+    if (!best.has_value()) {
+        return std::nullopt;
+    }
+    return stitched.poses[cameras[*best]].name;
 }
 
 }  // namespace streetpano::stitch

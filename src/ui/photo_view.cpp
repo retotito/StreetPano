@@ -163,6 +163,9 @@ void PhotoView::mouseMoveEvent(QMouseEvent* event) {
 
 void PhotoView::mouseReleaseEvent(QMouseEvent* event) {
     constexpr qsizetype kMinLassoPoints = 3;
+    if (event->button() == Qt::RightButton && !moved_ && !image_.isNull()) {
+        emit imageRightClicked(toImage(event->position()), event->globalPosition().toPoint());
+    }
     if (event->button() != Qt::LeftButton) {
         return;
     }

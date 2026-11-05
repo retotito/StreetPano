@@ -55,9 +55,9 @@ flowchart LR
 
 This tests the core idea, and the riskiest part of it, early.
 
-- [x] [Mark areas by hand](adr/0014-edits-as-saved-decisions.md) on the panorama, and choose
-  which photo fills them, with undo
-- [ ] Choose the best photo for "keep whole" and "remove" automatically
+- [x] [Mark areas by hand](adr/0014-edits-as-saved-decisions.md) on the panorama, with "keep
+  whole", "remove" and undo
+- [ ] Correct an object from a description, using AI
 - [ ] Add the parallax check and clean plate
 - [ ] Test SAM 2 tracking across photos
 

@@ -24,6 +24,23 @@ photo chosen.
   place, so an interrupted save can't damage them.
 - Finding camera positions no longer deletes the work folder, only COLMAP's own files.
 
+## Update: choices instead of keys
+
+Asking users to step through photos with keys proved hard to understand, and square brackets
+are awkward on a Swiss keyboard. So:
+
+- An outline only marks an area. Nothing changes until a choice is made from a menu, which
+  opens by itself and on right-click. The same choices are in a toolbar.
+- **Remove** picks the photo closest to the median of the photos that see the area, because an
+  object that's only in some of them is far from the median.
+- **Keep whole** picks the photo looking most directly at the area.
+- **Describing a fix for the AI** saves the words with the area and changes nothing, and the
+  interface says so, because no AI exists yet.
+
+On the same panorama, Remove took about 0.3 to 0.5 s in a debug build. It removed a parked
+car's rear from the road, and two of three repeated vans. An area at the far end of the street
+was refused, because fewer than 3 photos saw it.
+
 ## Results
 
 On a real panorama of 16,154 x 3,961 px, marking an area or changing its photo took about
@@ -33,8 +50,10 @@ area around it.
 
 ## Consequences
 
-- Choosing between photos is manual for now. Choosing automatically, and selecting an object
-  with one click using AI, can both build on this operation.
+- Selecting an object with one click using AI, and correcting it from a description, can both
+  build on this operation.
+- Remove relies on most photos showing the area clean. An object seen by most of them, such as
+  one that's parked in front of the facade, can stay.
 - Edits run on the interface thread and redraw every area, so many areas will get slow.
 - The automatic result is kept in memory for redrawing, which adds up to the size of the
   panorama, about 256 MB at the 64 MP limit, once the first edit is made.

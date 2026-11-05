@@ -5,11 +5,14 @@
 #include <QLabel>
 #include <QListView>
 #include <QMainWindow>
+#include <QMenu>
+#include <QPoint>
 #include <QPointF>
 #include <QPolygonF>
 #include <QString>
 #include <cstddef>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "core/lru_cache.hpp"
@@ -50,6 +53,19 @@ class MainWindow : public QMainWindow {
     // Marks an area, given in panorama pixels, and fills it from the best photo. Returns false if
     // no photo can supply it.
     bool markArea(const QPolygonF& outline);
+    // The usual way to edit: an outline only marks an area, and nothing changes until one of these
+    // is chosen. They act on the outline just drawn, or else on the selected area.
+    void beginArea(const QPolygonF& outline);
+    bool removeObject();
+    bool keepObject();
+    // Saves what the user wants done here. No AI acts on it yet, so the panorama doesn't change.
+    bool describeFix(const QString& description);
+    bool cancelOrDeleteArea();
+    [[nodiscard]] bool hasPendingArea() const { return !pendingArea_.isEmpty(); }
+    [[nodiscard]] QMenu* areaMenu() const { return areaMenu_; }
+    [[nodiscard]] QString selectedAreaNote() const;
+    [[nodiscard]] QString editMessage() const { return editMessage_; }
+
     // Moves the selected area to the next or previous photo that can supply it.
     bool changeAreaPhoto(int step);
     bool deleteSelectedArea();
@@ -89,6 +105,11 @@ class MainWindow : public QMainWindow {
     void redrawPanorama();
     void applyDecisions(stitch::Decisions decisions, int selected);
     void updateEditActions();
+    void showAreaMenu(QPoint screenPoint);
+    void onAreaRightClicked(QPointF point, QPoint screenPoint);
+    void askForFixDescription();
+    [[nodiscard]] std::vector<core::WallPoint> targetOutline() const;
+    bool commitArea(std::string photo, const QString& message);
     [[nodiscard]] std::vector<std::size_t> photoChoices(const core::Patch& patch) const;
     [[nodiscard]] QString findPosesFile() const;
 
@@ -113,6 +134,11 @@ class MainWindow : public QMainWindow {
     QString editMessage_;
     int selectedArea_ = -1;
     bool showingPanorama_ = false;
+    QPolygonF pendingArea_;
+    QMenu* areaMenu_ = nullptr;
+    QAction* removeObjectAction_ = nullptr;
+    QAction* keepObjectAction_ = nullptr;
+    QAction* describeFixAction_ = nullptr;
     QAction* markAreaAction_ = nullptr;
     QAction* nextAreaPhotoAction_ = nullptr;
     QAction* previousAreaPhotoAction_ = nullptr;

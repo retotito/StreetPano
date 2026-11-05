@@ -27,9 +27,9 @@ hard cases, such as tree branches.
 !!! note "What the automatic seams already do"
     Seams avoid places where photos disagree, so they often keep nearby objects whole or
     replace them with a neighbouring photo's view. They choose without asking, and can
-    also lose or repeat objects. For now, you can
-    [outline an area and choose which photo fills it](../adr/0014-edits-as-saved-decisions.md).
-    Click to select, and the actions below, are still to come.
+    also lose or repeat objects. So you can
+    [outline an area, and then remove or keep what's in it](../adr/0014-edits-as-saved-decisions.md).
+    Click to select, and AI correction from a description, are still to come.
 
 ## Actions
 

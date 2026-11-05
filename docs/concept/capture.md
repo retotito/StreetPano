@@ -100,14 +100,21 @@ folder to start again, which also deletes your edits. Your original photos are n
 Seams go around most objects by themselves, but they can also remove or repeat them. To
 overrule them while the panorama is showing:
 
-| Key | Action |
+1. Click **Mark an Area** in the toolbar, and drag an outline around the object. Nothing
+   changes yet.
+2. A menu opens by itself. You can also right-click an outline at any time to open it.
+3. Choose what should happen:
+
+| Choice | What it does |
 |---|---|
-| ++l++ | Turn on Mark Area, then drag an outline around the object or the empty spot |
-| ++bracket-left++ and ++bracket-right++ | Step through the photos that can fill the area |
-| Click | Select an area, or nothing if you click outside them all |
-| ++backspace++ | Delete the selected area |
-| ++ctrl+z++ and ++ctrl+shift+z++ | Undo and redo (++cmd++ on a Mac) |
-| ++ctrl+s++ | Save the panorama with your edits (++cmd++ on a Mac) |
+| **Remove This Object** | Fills the area from the photo that shows it cleanest |
+| **Keep This Object Whole** | Takes all of the area from one photo |
+| **Try a Different Photo** | If the result isn't right, fills the area from another photo |
+| **Describe a Fix for the AI** | Saves your description with the area. The AI isn't built yet, so nothing changes for now |
+| **Cancel or Delete This Area** | Removes the outline, and your edit if you've made one |
+
+Undo and redo are in the toolbar too. You can zoom with the wheel, and pan by dragging with
+the right mouse button. To save the panorama with your edits, choose **File > Save Panorama**.
 
 Your edits are saved straight away in `decisions.json`, in the `.streetpano` folder, and come
 back when you stitch again. They contain no pixels, and your photos are never changed. Zoom

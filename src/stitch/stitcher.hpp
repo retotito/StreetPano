@@ -7,7 +7,9 @@
 #include <QStringList>
 #include <atomic>
 #include <functional>
+#include <optional>
 #include <span>
+#include <string>
 #include <vector>
 
 #include "core/facade_surface.hpp"
@@ -56,5 +58,11 @@ using StitchProgress = std::function<void(int done, int total)>;
 [[nodiscard]] QImage withPatches(const StitchResult& stitched, const QDir& photoFolder,
                                  std::span<const core::Patch> patches, QStringList& warnings,
                                  int featherPixels = core::StitchOptions{}.featherPixels);
+
+// Returns the photo that shows an area cleanest, to remove what's in it, from those that can see
+// it. Returns nothing if there are too few photos to compare.
+[[nodiscard]] std::optional<std::string> cleanestPhoto(const StitchResult& stitched,
+                                                       const QDir& photoFolder,
+                                                       std::span<const core::WallPoint> outline);
 
 }  // namespace streetpano::stitch

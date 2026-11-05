@@ -4,10 +4,12 @@
 #include <catch2/catch_test_macros.hpp>
 #include <cstdint>
 #include <cstdlib>
+#include <optional>
 #include <vector>
 
 using streetpano::core::CameraPose;
 using streetpano::core::CanvasView;
+using streetpano::core::cleanestRegion;
 using streetpano::core::drawPatch;
 using streetpano::core::FacadeSurface;
 using streetpano::core::ImageView;
@@ -193,4 +195,53 @@ TEST_CASE("a patch that can't be drawn changes nothing") {
                   4);
     }
     REQUIRE(scene.pixels == before);
+}
+
+namespace {
+
+constexpr int kRegion = 20;
+
+std::vector<std::uint32_t> solidRegion(std::uint32_t colour) {
+    return std::vector<std::uint32_t>(kRegion * kRegion, colour);
+}
+
+ImageView viewOf(const std::vector<std::uint32_t>& pixels) {
+    return {pixels.data(), kRegion, kRegion, kRegion * sizeof(std::uint32_t)};
+}
+
+}  // namespace
+
+TEST_CASE("the photos that agree are the clean ones") {
+    auto withObject = solidRegion(0xFF808080U);
+    for (std::size_t index = 0; index < 200; ++index) {
+        withObject[index] = 0xFF101010U;
+    }
+    const auto clean = solidRegion(0xFF808080U);
+    const auto nearlyClean = solidRegion(0xFF828282U);
+    const std::vector<ImageView> regions = {viewOf(withObject), viewOf(nearlyClean), viewOf(clean)};
+    REQUIRE(cleanestRegion(regions) == std::optional<std::size_t>(2));
+}
+
+TEST_CASE("a photo that sees too little of the area can't be the cleanest") {
+    const auto clean = solidRegion(0xFF808080U);
+    auto partial = solidRegion(0xFF808080U);
+    for (std::size_t index = 40; index < partial.size(); ++index) {
+        partial[index] = 0U;
+    }
+    const auto noisy = solidRegion(0xFF848484U);
+    const std::vector<ImageView> regions = {viewOf(partial), viewOf(clean), viewOf(noisy),
+                                            viewOf(clean)};
+    REQUIRE(cleanestRegion(regions) == std::optional<std::size_t>(1));
+}
+
+TEST_CASE("the cleanest photo needs at least three to compare") {
+    const auto clean = solidRegion(0xFF808080U);
+    const std::vector<ImageView> two = {viewOf(clean), viewOf(clean)};
+    REQUIRE_FALSE(cleanestRegion(two).has_value());
+}
+
+TEST_CASE("photos that see none of the area give no answer") {
+    const auto empty = solidRegion(0U);
+    const std::vector<ImageView> regions = {viewOf(empty), viewOf(empty), viewOf(empty)};
+    REQUIRE_FALSE(cleanestRegion(regions).has_value());
 }

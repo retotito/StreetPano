@@ -19,6 +19,10 @@ struct Box {
     double top = -std::numeric_limits<double>::infinity();
 };
 
+[[nodiscard]] std::uint32_t brightnessLevel(std::uint32_t pixel) {
+    return (((pixel >> 16U) & 0xFFU) + 2U * ((pixel >> 8U) & 0xFFU) + (pixel & 0xFFU)) / 4U;
+}
+
 [[nodiscard]] Box boxOf(std::span<const WallPoint> outline) {
     Box box;
     for (const WallPoint& point : outline) {
@@ -116,6 +120,58 @@ std::vector<std::size_t> patchChoices(const FacadeSurface& surface,
         result.push_back(choice.camera);
     }
     return result;
+}
+
+std::optional<std::size_t> cleanestRegion(std::span<const ImageView> regions) {
+    constexpr std::size_t kMinPhotos = 3;
+    constexpr double kMinCoveredShare = 0.6;
+    if (regions.size() < kMinPhotos) {
+        return std::nullopt;
+    }
+    const int width = regions.front().width;
+    const int height = regions.front().height;
+    std::vector<double> differences(regions.size(), 0.0);
+    std::vector<std::size_t> covered(regions.size(), 0);
+    std::vector<std::uint32_t> levels;
+    levels.reserve(regions.size());
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            levels.clear();
+            for (const ImageView& region : regions) {
+                const std::uint32_t pixel = rowOf(region, y)[x];
+                if ((pixel >> 24U) != 0U) {
+                    levels.push_back(brightnessLevel(pixel));
+                }
+            }
+            if (levels.size() < kMinPhotos) {
+                continue;
+            }
+            const auto middle = levels.begin() + static_cast<std::ptrdiff_t>(levels.size() / 2);
+            std::nth_element(levels.begin(), middle, levels.end());
+            const std::uint32_t median = *middle;
+            for (std::size_t index = 0; index < regions.size(); ++index) {
+                const std::uint32_t pixel = rowOf(regions[index], y)[x];
+                if ((pixel >> 24U) != 0U) {
+                    const std::uint32_t level = brightnessLevel(pixel);
+                    differences[index] += level > median ? level - median : median - level;
+                    ++covered[index];
+                }
+            }
+        }
+    }
+    const auto minCovered = static_cast<std::size_t>(kMinCoveredShare * width * height);
+    std::optional<std::size_t> best;
+    double bestScore = std::numeric_limits<double>::infinity();
+    for (std::size_t index = 0; index < regions.size(); ++index) {
+        if (covered[index] >= minCovered && minCovered > 0) {
+            const double score = differences[index] / static_cast<double>(covered[index]);
+            if (score < bestScore) {
+                bestScore = score;
+                best = index;
+            }
+        }
+    }
+    return best;
 }
 
 void drawPatch(const FacadeSurface& surface, const StitchPlan& plan,

@@ -1,8 +1,10 @@
 #include "stitch/stitcher.hpp"
 
+#include <QAction>
 #include <QDir>
 #include <QFile>
 #include <QJsonArray>
+#include <QMenu>
 #include <QPolygonF>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -52,6 +54,16 @@ class StitcherTest : public QObject {
     void editsComeBackAfterStitchingAgain();
     void editingIsOnlyForThePanorama();
     void savesThePanoramaWithItsEdits();
+    void anOutlineChangesNothingUntilAChoiceIsMade();
+    void removeUsesThePhotoThatShowsTheAreaClean();
+    void keepUsesThePhotoLookingStraightAtTheArea();
+    void removeWorksOnAnAreaAlreadyMade();
+    void cancelDropsAnOutline();
+    void aDescriptionIsSavedAndChangesNothing();
+    void anEmptyDescriptionIsIgnored();
+    void theAreaMenuOffersTheChoices();
+    void rightClickSelectsAnArea();
+    void tooFewPhotosCantRemove();
     void hidesExposureDifferencesAtSeams();
     void reportsProgress();
     void respectsTheMemoryBudget();
@@ -346,7 +358,7 @@ void StitcherTest::patchesAreDrawnFromTheOriginalPhoto() {
     QVERIFY(red.save(QDir(street.folder.path()).filePath(QStringLiteral("005.png"))));
 
     const QPolygonF square = squareAt(result.base);
-    const Patch patch{wallSquare(result, square), "005.png"};
+    const Patch patch{wallSquare(result, square), "005.png", {}};
     QStringList warnings;
     const QImage patched = withPatches(result, QDir(street.folder.path()), {&patch, 1}, warnings);
     QVERIFY(warnings.isEmpty());
@@ -361,7 +373,7 @@ void StitcherTest::patchesAreDrawnFromTheOriginalPhoto() {
 void StitcherTest::aPatchWithAnUnknownPhotoGivesAWarning() {
     const Street street;
     const auto result = stitchPanorama(street.poses(), QDir(street.folder.path()));
-    const Patch patch{wallSquare(result, squareAt(result.base)), "not-here.png"};
+    const Patch patch{wallSquare(result, squareAt(result.base)), "not-here.png", {}};
     QStringList warnings;
     const QImage patched = withPatches(result, QDir(street.folder.path()), {&patch, 1}, warnings);
     QCOMPARE(warnings.size(), 1);
@@ -372,7 +384,7 @@ void StitcherTest::aPatchWithAMissingPhotoGivesAWarning() {
     const Street street;
     const auto result = stitchPanorama(street.poses(), QDir(street.folder.path()));
     QVERIFY(QFile::remove(QDir(street.folder.path()).filePath(QStringLiteral("005.png"))));
-    const Patch patch{wallSquare(result, squareAt(result.base)), "005.png"};
+    const Patch patch{wallSquare(result, squareAt(result.base)), "005.png", {}};
     QStringList warnings;
     const QImage patched = withPatches(result, QDir(street.folder.path()), {&patch, 1}, warnings);
     QCOMPARE(warnings.size(), 1);
@@ -520,6 +532,188 @@ void StitcherTest::savesThePanoramaWithItsEdits() {
     QVERIFY(window.savePanoramaFile());
     QVERIFY(QFile::exists(window.panoramaPath()));
     QVERIFY(!QImage(window.panoramaPath()).isNull());
+}
+
+void StitcherTest::anOutlineChangesNothingUntilAChoiceIsMade() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    const QImage before = window.panorama();
+    window.markAreaAction()->setChecked(true);
+    window.beginArea(squareAt(before));
+    QVERIFY(window.hasPendingArea());
+    QVERIFY(!window.markAreaAction()->isChecked());  // The next drag moves the view again.
+    QCOMPARE(window.areaCount(), 0);
+    QCOMPARE(window.panorama(), before);
+    QVERIFY(!QFile::exists(window.decisionsPath()));
+}
+
+void StitcherTest::removeUsesThePhotoThatShowsTheAreaClean() {
+    const Street street;
+    // This photo looks straight at the area, but has something in the way.
+    QImage red(StreetFixture::kWidth, StreetFixture::kHeight, QImage::Format_RGB32);
+    red.fill(qRgb(250, 10, 10));
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    const QPolygonF square = squareAt(window.panorama());
+    QVERIFY(window.markArea(square));
+    const QString straight = window.selectedAreaPhoto();
+    QVERIFY(window.deleteSelectedArea());
+    QVERIFY(red.save(QDir(street.folder.path()).filePath(straight)));
+
+    window.beginArea(square);
+    QVERIFY(window.removeObject());
+    QVERIFY(!window.hasPendingArea());
+    QCOMPARE(window.areaCount(), 1);
+    QCOMPARE(window.selectedArea(), 0);
+    QVERIFY(window.selectedAreaPhoto() != straight);
+    QVERIFY(window.editMessage().contains(QStringLiteral("Removed")));
+    // Undoing goes back to before the area existed.
+    QVERIFY(window.undo());
+    QCOMPARE(window.areaCount(), 0);
+}
+
+void StitcherTest::keepUsesThePhotoLookingStraightAtTheArea() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    const QPolygonF square = squareAt(window.panorama());
+    QVERIFY(window.markArea(square));
+    const QString straight = window.selectedAreaPhoto();
+    QVERIFY(window.deleteSelectedArea());
+    window.beginArea(square);
+    QVERIFY(window.keepObject());
+    QCOMPARE(window.selectedAreaPhoto(), straight);
+    QVERIFY(window.editMessage().contains(QStringLiteral("Kept")));
+}
+
+void StitcherTest::removeWorksOnAnAreaAlreadyMade() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    QVERIFY(!window.removeObject());  // Nothing is marked yet.
+    QVERIFY(!window.keepObject());
+    QVERIFY(window.markArea(squareAt(window.panorama())));
+    QVERIFY(window.removeObject());
+    QVERIFY(window.keepObject());
+    QCOMPARE(window.areaCount(), 1);
+}
+
+void StitcherTest::cancelDropsAnOutline() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    QVERIFY(!window.cancelOrDeleteArea());
+    window.beginArea(squareAt(window.panorama()));
+    QVERIFY(window.cancelOrDeleteArea());
+    QVERIFY(!window.hasPendingArea());
+    QCOMPARE(window.areaCount(), 0);
+    QVERIFY(window.markArea(squareAt(window.panorama())));
+    QVERIFY(window.cancelOrDeleteArea());
+    QCOMPARE(window.areaCount(), 0);
+}
+
+void StitcherTest::aDescriptionIsSavedAndChangesNothing() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    const QImage before = window.panorama();
+    window.beginArea(squareAt(before));
+    QVERIFY(window.describeFix(QStringLiteral("  remove the white van ")));
+    QCOMPARE(window.areaCount(), 1);
+    QCOMPARE(window.selectedAreaNote(), QStringLiteral("remove the white van"));
+    QVERIFY(window.selectedAreaPhoto().isEmpty());
+    QCOMPARE(window.panorama(), before);
+    QVERIFY(window.editMessage().contains(QStringLiteral("No AI")));
+    QVERIFY(window.positionText().contains(QStringLiteral("waiting for the AI")));
+    const auto saved = readDecisions(window.decisionsPath());
+    QCOMPARE(saved.decisions->patches[0].note, std::string("remove the white van"));
+    // It can be changed, and comes back after stitching again.
+    QVERIFY(window.describeFix(QStringLiteral("remove the van")));
+    QCOMPARE(window.selectedAreaNote(), QStringLiteral("remove the van"));
+    QCOMPARE(window.areaCount(), 1);
+}
+
+void StitcherTest::anEmptyDescriptionIsIgnored() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    window.beginArea(squareAt(window.panorama()));
+    QVERIFY(!window.describeFix(QStringLiteral("   ")));
+    QVERIFY(window.hasPendingArea());
+    QVERIFY(window.selectedAreaNote().isEmpty());
+}
+
+void StitcherTest::theAreaMenuOffersTheChoices() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    QStringList labels;
+    for (const QAction* action : window.areaMenu()->actions()) {
+        labels.append(action->text());
+    }
+    const QString all = labels.join(u' ');
+    QVERIFY(all.contains(QStringLiteral("Remove")));
+    QVERIFY(all.contains(QStringLiteral("Keep")));
+    QVERIFY(all.contains(QStringLiteral("Different Photo")));
+    QVERIFY(all.contains(QStringLiteral("AI Not Built Yet")));
+    QVERIFY(all.contains(QStringLiteral("Cancel")));
+    // Drawing an outline in the view opens the menu by itself.
+    streetpano::ui::PhotoView* view = window.photoView();
+    view->resize(800, 400);
+    window.markAreaAction()->setChecked(true);
+    emit view->lassoFinished(squareAt(window.panorama()));
+    QVERIFY(window.hasPendingArea());
+    QVERIFY(window.areaMenu()->isVisible());
+    window.areaMenu()->hide();
+}
+
+void StitcherTest::rightClickSelectsAnArea() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    const QPolygonF square = squareAt(window.panorama());
+    QVERIFY(window.markArea(square));
+    streetpano::ui::PhotoView* view = window.photoView();
+    // Right-clicking away from every area explains what to do.
+    window.selectAreaAt(QPointF(1, 1));
+    emit view->imageRightClicked(QPointF(1, 1), QPoint(0, 0));
+    QVERIFY(!window.areaMenu()->isVisible());
+    QVERIFY(window.editMessage().contains(QStringLiteral("Mark an Area")));
+    emit view->imageRightClicked(square.boundingRect().center(), QPoint(0, 0));
+    QCOMPARE(window.selectedArea(), 0);
+    QVERIFY(window.areaMenu()->isVisible());
+    window.areaMenu()->hide();
+    // A pending outline stays when it's the one clicked, and goes when another place is.
+    window.beginArea(square);
+    emit view->imageRightClicked(square.boundingRect().center(), QPoint(0, 0));
+    QVERIFY(window.hasPendingArea());
+    window.areaMenu()->hide();
+    emit view->imageRightClicked(QPointF(1, 1), QPoint(0, 0));
+    QVERIFY(!window.hasPendingArea());
+    window.selectPhoto(1);
+    emit view->imageRightClicked(square.boundingRect().center(), QPoint(0, 0));
+    QVERIFY(!window.areaMenu()->isVisible());
+}
+
+void StitcherTest::tooFewPhotosCantRemove() {
+    const Street street(2);
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    window.beginArea(squareAt(window.panorama()));
+    QVERIFY(!window.removeObject());
+    QVERIFY(window.editMessage().contains(QStringLiteral("Too few")));
+    QVERIFY(window.hasPendingArea());
 }
 
 void StitcherTest::windowStitchesAndShowsThePanorama() {
