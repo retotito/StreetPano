@@ -24,6 +24,11 @@ hard cases, such as tree branches.
     1 m apart. Known camera positions can predict where an object should appear,
     but this has to be tested early. See the [roadmap](../roadmap.md).
 
+!!! note "What the automatic seams already do"
+    Seams avoid places where photos disagree, so they often keep nearby objects whole or
+    replace them with a neighbouring photo's view. They choose without asking, and can
+    also lose or repeat objects, so marking an object has to override them.
+
 ## Actions
 
 | Action | Best for | What happens | Generated pixels |

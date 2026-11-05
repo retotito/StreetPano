@@ -41,8 +41,8 @@ struct PlanResult {
     std::string error;
 };
 
-// Gives each photo the columns closest to where its optical axis meets the facade. Straight
-// vertical seams are a first step: foreground objects will be visibly cut at them.
+// Gives each photo the columns closest to where its optical axis meets the facade. These are
+// starting points, and drawStrip moves the seams from there.
 [[nodiscard]] PlanResult makeStitchPlan(const FacadeSurface& surface,
                                         std::span<const CameraPose> poses, double focalPixels,
                                         int photoWidth, int photoHeight,
@@ -64,8 +64,20 @@ struct CanvasView {
     std::size_t bytesPerLine = 0;
 };
 
-// Projects one photo onto the panorama and blends it across the seams. focalPixels must
-// match the size of the image passed in.
+// Returns what to multiply a new photo by to match what's drawn so far, where they overlap.
+// region holds the new photo from column firstX onwards, with zero alpha where it has no pixels.
+[[nodiscard]] double brightnessGain(const CanvasView& canvas, const ImageView& region, int firstX);
+
+// Finds the cheapest top-to-bottom path through the overlap of what's drawn so far and a new
+// photo. Cost is how much they disagree, so the path runs around objects that differ between
+// photos, such as cars. Nearby objects can't be replaced if no photo shows what's behind them.
+// region holds the new photo from column firstX onwards, with zero alpha where it has no pixels.
+// Returns one column per canvas row.
+[[nodiscard]] std::vector<int> findSeam(const CanvasView& canvas, const ImageView& region,
+                                        int firstX, int preferredX, int reach);
+
+// Projects one photo onto the panorama, up to one reach past its own strip, and joins it along
+// the cheapest seam. Draw strips from left to right. focalPixels must match the image's size.
 void drawStrip(const FacadeSurface& surface, const StitchPlan& plan, const Strip& strip,
                const CameraPose& pose, double focalPixels, const ImageView& photo,
                const CanvasView& canvas, int featherPixels);

@@ -44,9 +44,10 @@ flowchart LR
 - [x] Straighten facades: fit lines, and adjust the wall until photos agree at seams
 - [ ] Let users correct the wall where the automatic distance is wrong, and level
   rooflines by hand
-- [ ] Choose a [licence-compatible graph cut](concept/ai-models.md)
 - [x] First stitch with straight seams and a short blend, shown in the app
-- [ ] Graph-cut seams and pyramid blending
+- [x] [Cheapest-path seams](adr/0013-cheapest-path-seams.md) that go around objects, and
+  brightness matching between photos
+- [ ] Pyramid blending
 
 **Done when:** 100 m of street produces a panorama with aligned facades.
 

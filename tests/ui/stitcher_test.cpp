@@ -136,19 +136,15 @@ void StitcherTest::matchesTheTrueFacadeWhenReduced() {
 }
 
 void StitcherTest::hidesExposureDifferencesAtSeams() {
-    QTemporaryDir folder;
-    for (int index = 0; index < 4; ++index) {
-        StreetFixture::writePhoto(folder, index, index % 2 == 0 ? 0.7 : 1.0);
-    }
-    const auto poses =
-        *readPoseFile(StreetFixture::writePoses(folder, StreetFixture::poses(4))).file;
-    StitchOptions feathered;
-    feathered.featherPixels = 8;
-    StitchOptions hard;
-    hard.featherPixels = 0;
-    const auto soft = stitchPanorama(poses, QDir(folder.path()), feathered);
-    const auto sharp = stitchPanorama(poses, QDir(folder.path()), hard);
-
+    const auto stitchWith = [](double darker) {
+        QTemporaryDir folder;
+        for (int index = 0; index < 4; ++index) {
+            StreetFixture::writePhoto(folder, index, index % 2 == 0 ? darker : 1.0);
+        }
+        const auto poses =
+            *readPoseFile(StreetFixture::writePoses(folder, StreetFixture::poses(4))).file;
+        return stitchPanorama(poses, QDir(folder.path()));
+    };
     const auto largestStep = [](const QImage& image) {
         int largest = 0;
         const int y = image.height() / 2;
@@ -157,7 +153,10 @@ void StitcherTest::hidesExposureDifferencesAtSeams() {
         }
         return largest;
     };
-    QVERIFY(largestStep(soft.panorama) < largestStep(sharp.panorama));
+    // Compared with evenly lit photos, a 15% difference must leave no visible step.
+    const int even = largestStep(stitchWith(1.0).panorama);
+    const int uneven = largestStep(stitchWith(0.85).panorama);
+    QVERIFY2(uneven <= even + 4, qPrintable(QStringLiteral("%1 and %2").arg(even).arg(uneven)));
 }
 
 void StitcherTest::reportsProgress() {

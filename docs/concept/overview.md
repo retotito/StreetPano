@@ -32,8 +32,8 @@ StreetPano handles the problem in layers, using the simplest method that works:
 
 1. **Project onto the facade.** Camera positions recovered from the photos allow
    each photo to be projected onto the facade, which aligns everything on it.
-2. **Choose seams.** A graph cut decides which photo supplies each pixel, so that
-   seams run where neighbouring photos agree.
+2. **Choose seams.** A cheapest path decides where each photo takes over, so that seams
+   run where neighbouring photos agree.
 3. **Treat objects explicitly.** Each foreground object is kept whole from one
    photo, or removed using facade pixels from other photos.
 4. **Generate only as a last resort.** AI fills only what no photo shows, and
