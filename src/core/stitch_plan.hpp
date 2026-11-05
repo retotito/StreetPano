@@ -9,6 +9,7 @@
 
 #include "core/camera_pose.hpp"
 #include "core/facade_surface.hpp"
+#include "core/pixels.hpp"
 
 namespace streetpano::core {
 
@@ -48,25 +49,18 @@ struct PlanResult {
                                         int photoWidth, int photoHeight,
                                         const StitchOptions& options);
 
-// A photo in memory, as 32-bit 0xAARRGGBB pixels.
-struct ImageView {
-    const std::uint32_t* pixels = nullptr;
-    int width = 0;
-    int height = 0;
-    std::size_t bytesPerLine = 0;
-};
-
-// The panorama in memory. Alpha is zero where nothing has been drawn yet.
-struct CanvasView {
-    std::uint32_t* pixels = nullptr;
-    int width = 0;
-    int height = 0;
-    std::size_t bytesPerLine = 0;
-};
-
 // Returns what to multiply a new photo by to match what's drawn so far, where they overlap.
 // region holds the new photo from column firstX onwards, with zero alpha where it has no pixels.
-[[nodiscard]] double brightnessGain(const CanvasView& canvas, const ImageView& region, int firstX);
+[[nodiscard]] double brightnessGain(const CanvasView& canvas, const ImageView& region, int firstX,
+                                    int firstY = 0);
+
+// Projects a photo onto part of the panorama, with zero alpha where it has no pixels. Returns
+// rows of endX - firstX pixels. focalPixels must match the image's size.
+[[nodiscard]] std::vector<std::uint32_t> projectPhoto(const FacadeSurface& surface,
+                                                      const StitchPlan& plan,
+                                                      const CameraPose& pose, double focalPixels,
+                                                      const ImageView& photo, int firstX, int endX,
+                                                      int firstY, int endY);
 
 // Finds the cheapest top-to-bottom path through the overlap of what's drawn so far and a new
 // photo. Cost is how much they disagree, so the path runs around objects that differ between

@@ -29,9 +29,9 @@ The first version works from end to end, using only some of these steps:
 
 ![A first panorama of a synthetic street, with a sharp facade and squeezed cars](../assets/first-panorama.jpg)
 
-- **Built:** camera positions, a facade surface that follows the street, seams that go around objects, and brightness matching.
-- **Not built yet:** lens correction, RAW, marking objects to keep or remove, and pyramid
-  blending.
+- **Built:** camera positions, a facade surface that follows the street, seams that go around objects, brightness matching, and areas marked by hand.
+- **Not built yet:** lens correction, RAW, automatic keep and remove, AI selection and fill,
+  and pyramid blending.
 
 The picture above is from an earlier synthetic street, with straight seams.
 

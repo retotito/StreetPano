@@ -93,7 +93,28 @@ RAW photos need converting to JPEG first for now, which drops the focal length f
 the converted files.
 
 The results go in a `my-street.streetpano` folder next to your photos. Delete that
-folder to start again. Your original photos are never changed.
+folder to start again, which also deletes your edits. Your original photos are never changed.
+
+## Fixing objects in the panorama
+
+Seams go around most objects by themselves, but they can also remove or repeat them. To
+overrule them while the panorama is showing:
+
+| Key | Action |
+|---|---|
+| ++l++ | Turn on Mark Area, then drag an outline around the object or the empty spot |
+| ++bracket-left++ and ++bracket-right++ | Step through the photos that can fill the area |
+| Click | Select an area, or nothing if you click outside them all |
+| ++backspace++ | Delete the selected area |
+| ++ctrl+z++ and ++ctrl+shift+z++ | Undo and redo (++cmd++ on a Mac) |
+| ++ctrl+s++ | Save the panorama with your edits (++cmd++ on a Mac) |
+
+Your edits are saved straight away in `decisions.json`, in the `.streetpano` folder, and come
+back when you stitch again. They contain no pixels, and your photos are never changed. Zoom
+with the wheel. While marking, pan with the right mouse button.
+
+If you delete `poses.json` and find the camera positions again, the positions can change
+slightly, so check your edits afterwards.
 
 ## Parked cars: use a higher camera
 

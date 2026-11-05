@@ -3,24 +3,32 @@
 #include <QDir>
 #include <QFile>
 #include <QJsonArray>
+#include <QPolygonF>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QtTest>
 #include <atomic>
 #include <cmath>
+#include <cstddef>
 #include <vector>
 
 #include "core/stitch_plan.hpp"
+#include "stitch/decisions.hpp"
 #include "stitch/pose_file.hpp"
 #include "stitch_fixture.hpp"
 #include "test_helpers.hpp"
 #include "ui/main_window.hpp"
 #include "ui/stitch_job.hpp"
 
+using streetpano::core::Patch;
 using streetpano::core::StitchOptions;
+using streetpano::core::WallPoint;
 using streetpano::stitch::PoseFile;
+using streetpano::stitch::readDecisions;
 using streetpano::stitch::readPoseFile;
 using streetpano::stitch::stitchPanorama;
+using streetpano::stitch::StitchResult;
+using streetpano::stitch::withPatches;
 using streetpano::test::StreetFixture;
 using streetpano::ui::MainWindow;
 using streetpano::ui::StitchJob;
@@ -32,6 +40,18 @@ class StitcherTest : public QObject {
     void matchesTheTrueFacade();
     void matchesTheTrueFacadeWhenReduced();
     void alignsAWallThatStartsTooNear();
+    void patchesAreDrawnFromTheOriginalPhoto();
+    void aPatchWithAnUnknownPhotoGivesAWarning();
+    void aPatchWithAMissingPhotoGivesAWarning();
+    void noPatchesLeaveTheBaseAsItIs();
+    void markingAnAreaSavesADecision();
+    void editsCanBeUndoneAndRedone();
+    void changingAPhotoStepsThroughTheChoices();
+    void clickingSelectsAnArea();
+    void deletingAnAreaRestoresThePanorama();
+    void editsComeBackAfterStitchingAgain();
+    void editingIsOnlyForThePanorama();
+    void savesThePanoramaWithItsEdits();
     void hidesExposureDifferencesAtSeams();
     void reportsProgress();
     void respectsTheMemoryBudget();
@@ -289,6 +309,217 @@ void StitcherTest::jobCanBeDestroyedWhileRunning() {
     }
     const StitchJob neverStarted(street.posesPath, QDir(street.folder.path()), QString());
     QVERIFY(neverStarted.outputPath().isEmpty());
+}
+
+namespace {
+
+// A square of panorama pixels near the middle.
+QPolygonF squareAt(const QImage& panorama, int size = 40) {
+    const double x = panorama.width() / 2.0;
+    const double y = panorama.height() / 2.0;
+    return QPolygonF{QPointF(x, y), QPointF(x + size, y), QPointF(x + size, y + size),
+                     QPointF(x, y + size)};
+}
+
+std::vector<WallPoint> wallSquare(const StitchResult& result, const QPolygonF& polygon) {
+    std::vector<WallPoint> wall;
+    for (const QPointF& point : polygon) {
+        wall.push_back({result.plan.leftArc + point.x() * result.plan.unitsPerPixel,
+                        result.plan.topHeight - point.y() * result.plan.unitsPerPixel});
+    }
+    return wall;
+}
+
+bool stitchInWindow(MainWindow& window, const Street& street) {
+    return window.openFolder(street.folder.path()) && window.startStitch(street.posesPath);
+}
+
+}  // namespace
+
+void StitcherTest::patchesAreDrawnFromTheOriginalPhoto() {
+    const Street street;
+    auto result = stitchPanorama(street.poses(), QDir(street.folder.path()));
+    QVERIFY(result.error.isEmpty());
+    // A photo of solid red, in place of the one the patch takes its pixels from.
+    QImage red(StreetFixture::kWidth, StreetFixture::kHeight, QImage::Format_RGB32);
+    red.fill(qRgb(250, 10, 10));
+    QVERIFY(red.save(QDir(street.folder.path()).filePath(QStringLiteral("005.png"))));
+
+    const QPolygonF square = squareAt(result.base);
+    const Patch patch{wallSquare(result, square), "005.png"};
+    QStringList warnings;
+    const QImage patched = withPatches(result, QDir(street.folder.path()), {&patch, 1}, warnings);
+    QVERIFY(warnings.isEmpty());
+    const QPointF middle = square.boundingRect().center();
+    QVERIFY(qRed(patched.pixel(middle.toPoint())) > 200);
+    QVERIFY(qGreen(patched.pixel(middle.toPoint())) < 60);
+    // Outside the area, and in the base, nothing has changed.
+    QCOMPARE(patched.pixel(10, 10), result.base.pixel(10, 10));
+    QVERIFY(qRed(result.base.pixel(middle.toPoint())) != qRed(patched.pixel(middle.toPoint())));
+}
+
+void StitcherTest::aPatchWithAnUnknownPhotoGivesAWarning() {
+    const Street street;
+    const auto result = stitchPanorama(street.poses(), QDir(street.folder.path()));
+    const Patch patch{wallSquare(result, squareAt(result.base)), "not-here.png"};
+    QStringList warnings;
+    const QImage patched = withPatches(result, QDir(street.folder.path()), {&patch, 1}, warnings);
+    QCOMPARE(warnings.size(), 1);
+    QCOMPARE(patched, result.base);
+}
+
+void StitcherTest::aPatchWithAMissingPhotoGivesAWarning() {
+    const Street street;
+    const auto result = stitchPanorama(street.poses(), QDir(street.folder.path()));
+    QVERIFY(QFile::remove(QDir(street.folder.path()).filePath(QStringLiteral("005.png"))));
+    const Patch patch{wallSquare(result, squareAt(result.base)), "005.png"};
+    QStringList warnings;
+    const QImage patched = withPatches(result, QDir(street.folder.path()), {&patch, 1}, warnings);
+    QCOMPARE(warnings.size(), 1);
+    QCOMPARE(patched, result.base);
+}
+
+void StitcherTest::noPatchesLeaveTheBaseAsItIs() {
+    const Street street;
+    const auto result = stitchPanorama(street.poses(), QDir(street.folder.path()));
+    QStringList warnings;
+    const QImage same = withPatches(result, QDir(street.folder.path()), {}, warnings);
+    QCOMPARE(same, result.base);
+}
+
+void StitcherTest::markingAnAreaSavesADecision() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    QVERIFY(window.isShowingPanorama());
+    QVERIFY(window.stitchMessage().contains(QStringLiteral("100% detail")));
+    QVERIFY(window.markArea(squareAt(window.panorama())));
+    QCOMPARE(window.areaCount(), 1);
+    QCOMPARE(window.selectedArea(), 0);
+    QVERIFY(!window.selectedAreaPhoto().isEmpty());
+    const auto saved = readDecisions(window.decisionsPath());
+    QVERIFY(saved.decisions.has_value());
+    QCOMPARE(saved.decisions->patches.size(), std::size_t{1});
+    QCOMPARE(QString::fromStdString(saved.decisions->patches[0].photo), window.selectedAreaPhoto());
+    QVERIFY(window.positionText().contains(QStringLiteral("Area 1 of 1")));
+}
+
+void StitcherTest::editsCanBeUndoneAndRedone() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    QVERIFY(!window.undo());
+    QVERIFY(!window.redo());
+    QVERIFY(window.markArea(squareAt(window.panorama())));
+    QVERIFY(window.undo());
+    QCOMPARE(window.areaCount(), 0);
+    QVERIFY(readDecisions(window.decisionsPath()).decisions->patches.empty());
+    QVERIFY(window.redo());
+    QCOMPARE(window.areaCount(), 1);
+    QCOMPARE(readDecisions(window.decisionsPath()).decisions->patches.size(), std::size_t{1});
+    // A new edit replaces what could have been redone.
+    QVERIFY(window.undo());
+    QVERIFY(window.markArea(squareAt(window.panorama(), 20)));
+    QVERIFY(!window.redo());
+}
+
+void StitcherTest::changingAPhotoStepsThroughTheChoices() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    QVERIFY(!window.changeAreaPhoto(1));  // Nothing is selected yet.
+    QVERIFY(window.markArea(squareAt(window.panorama())));
+    const QString first = window.selectedAreaPhoto();
+    QVERIFY(window.changeAreaPhoto(1));
+    QVERIFY(window.selectedAreaPhoto() != first);
+    QVERIFY(window.changeAreaPhoto(-1));
+    QCOMPARE(window.selectedAreaPhoto(), first);
+    QVERIFY(window.changeAreaPhoto(-1));
+    QVERIFY(window.selectedAreaPhoto() != first);
+}
+
+void StitcherTest::clickingSelectsAnArea() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    const QPolygonF square = squareAt(window.panorama());
+    QVERIFY(window.markArea(square));
+    window.selectAreaAt(QPointF(1.0, 1.0));
+    QCOMPARE(window.selectedArea(), -1);
+    QVERIFY(window.selectedAreaPhoto().isEmpty());
+    QVERIFY(!window.deleteSelectedArea());
+    window.selectAreaAt(square.boundingRect().center());
+    QCOMPARE(window.selectedArea(), 0);
+}
+
+void StitcherTest::deletingAnAreaRestoresThePanorama() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    const QImage before = window.panorama();
+    QVERIFY(window.markArea(squareAt(before)));
+    QVERIFY(window.deleteSelectedArea());
+    QCOMPARE(window.areaCount(), 0);
+    QCOMPARE(window.selectedArea(), -1);
+    QCOMPARE(window.panorama(), before);
+}
+
+void StitcherTest::editsComeBackAfterStitchingAgain() {
+    const Street street;
+    QString photo;
+    QString decisions;
+    {
+        MainWindow window;
+        QVERIFY(stitchInWindow(window, street));
+        QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+        QVERIFY(window.markArea(squareAt(window.panorama())));
+        photo = window.selectedAreaPhoto();
+        decisions = window.decisionsPath();
+    }
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    QCOMPARE(window.areaCount(), 1);
+    QCOMPARE(window.decisionsPath(), decisions);
+    window.selectAreaAt(squareAt(window.panorama()).boundingRect().center());
+    QCOMPARE(window.selectedAreaPhoto(), photo);
+}
+
+void StitcherTest::editingIsOnlyForThePanorama() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(window.openFolder(street.folder.path()));
+    QVERIFY(!window.markAreaAction()->isEnabled());
+    QVERIFY(window.startStitch(street.posesPath));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    QVERIFY(window.markAreaAction()->isEnabled());
+    window.markAreaAction()->setChecked(true);
+    QVERIFY(window.photoView()->isLassoMode());
+    window.selectPhoto(1);
+    QVERIFY(!window.isShowingPanorama());
+    QVERIFY(!window.markAreaAction()->isEnabled());
+    QVERIFY(!window.photoView()->isLassoMode());
+    QVERIFY(!window.markArea(QPolygonF{QPointF(0, 0), QPointF(10, 0), QPointF(10, 10)}));
+    window.selectAreaAt(QPointF(1, 1));
+    QCOMPARE(window.selectedArea(), -1);
+}
+
+void StitcherTest::savesThePanoramaWithItsEdits() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(!window.savePanoramaFile());  // Nothing to save yet.
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    QVERIFY(window.markArea(squareAt(window.panorama())));
+    QVERIFY(QFile::remove(window.panoramaPath()));
+    QVERIFY(window.savePanoramaFile());
+    QVERIFY(QFile::exists(window.panoramaPath()));
+    QVERIFY(!QImage(window.panoramaPath()).isNull());
 }
 
 void StitcherTest::windowStitchesAndShowsThePanorama() {

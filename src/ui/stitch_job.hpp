@@ -8,6 +8,7 @@
 #include <optional>
 #include <thread>
 
+#include "stitch/decisions.hpp"
 #include "stitch/stitcher.hpp"
 
 namespace streetpano::ui {
@@ -34,6 +35,8 @@ class StitchJob : public QObject {
 
     // Valid after finished has been emitted.
     [[nodiscard]] stitch::StitchResult takeResult();
+    [[nodiscard]] stitch::Decisions takeDecisions();
+    [[nodiscard]] QString decisionsPath() const { return stitch::decisionsPathFor(posesPath_); }
     [[nodiscard]] const QString& outputPath() const { return outputPath_; }
 
   signals:
@@ -58,6 +61,7 @@ class StitchJob : public QObject {
 
     std::mutex mutex_;
     stitch::StitchResult result_;
+    stitch::Decisions decisions_;
 
     std::optional<std::thread> worker_;
 };

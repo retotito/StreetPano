@@ -2,6 +2,9 @@ add_library(streetpano_core STATIC
     core/lru_cache.hpp
     core/photo_listing.cpp
     core/photo_listing.hpp
+    core/patch.cpp
+    core/patch.hpp
+    core/pixels.hpp
     core/seam_match.cpp
     core/seam_match.hpp
     core/stitch_plan.cpp
@@ -14,6 +17,8 @@ target_include_directories(streetpano_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(streetpano_core PUBLIC streetpano_options)
 
 add_library(streetpano_stitch STATIC
+    stitch/decisions.cpp
+    stitch/decisions.hpp
     stitch/pose_file.cpp
     stitch/pose_file.hpp
     stitch/stitcher.cpp

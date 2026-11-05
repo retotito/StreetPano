@@ -152,17 +152,18 @@ def list_photos(photo_dir: Path) -> list[Path]:
 def estimate_poses(photo_dir: Path, work_dir: Path, focal_px: float) -> PoseEstimate:
     """Reconstruct camera positions, using the known focal length.
 
-    ``work_dir`` must be new or empty. All photos must come from one camera at one
-    zoom setting, and lens distortion must already be removed. COLMAP's result varies
-    from run to run on real streets, so this one can vary too.
+    ``work_dir`` must not already have COLMAP's files in it, and anything else there is
+    left alone. All photos must come from one camera at one zoom setting, and lens
+    distortion must already be removed. COLMAP's result varies from run to run on real
+    streets, so this one can vary too.
     """
     import pycolmap
 
     if focal_px <= 0:
         raise ValueError(f"focal_px must be positive, got {focal_px}")
     photos = list_photos(photo_dir)
-    if work_dir.exists() and any(work_dir.iterdir()):
-        raise FileExistsError(f"work folder is not empty: {work_dir}")
+    if (work_dir / "database.db").exists() or (work_dir / "sparse").exists():
+        raise FileExistsError(f"work folder already has COLMAP files: {work_dir}")
     work_dir.mkdir(parents=True, exist_ok=True)
 
     with Image.open(photos[0]) as first:

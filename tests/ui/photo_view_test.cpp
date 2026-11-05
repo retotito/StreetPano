@@ -1,7 +1,13 @@
 #include "ui/photo_view.hpp"
 
+#include <QApplication>
 #include <QImage>
+#include <QMouseEvent>
+#include <QPolygonF>
+#include <QSignalSpy>
 #include <QtTest>
+#include <utility>
+#include <vector>
 
 using streetpano::ui::PhotoView;
 
@@ -9,6 +15,12 @@ class PhotoViewTest : public QObject {
     Q_OBJECT
 
   private slots:
+    void lassoReportsAnOutlineInImageCoordinates();
+    void aShortLassoIsIgnored();
+    void rightButtonStillPansInLassoMode();
+    void aClickReportsItsImagePoint();
+    void aDragIsNotAClick();
+    void outlinesAreDrawnOverTheImage();
     void startsEmptyWithAMessage();
     void fitsAnImageInsideTheWidget();
     void zoomKeepsThePointUnderTheCursorStill();
@@ -163,6 +175,99 @@ void PhotoViewTest::messageReplacesTheImage() {
     QVERIFY(view.image().isNull());
     view.setImage(testImage());
     QVERIFY(view.message().isEmpty());
+}
+
+void PhotoViewTest::lassoReportsAnOutlineInImageCoordinates() {
+    PhotoView view;
+    view.resize(400, 200);
+    QImage image(800, 400, QImage::Format_RGB32);
+    image.fill(Qt::gray);
+    view.setImage(image);  // Fitted at half size, so widget points are half of image points.
+    view.setLassoMode(true);
+    QSignalSpy finished(&view, &PhotoView::lassoFinished);
+    QTest::mousePress(&view, Qt::LeftButton, Qt::NoModifier, QPoint(10, 20));
+    for (const QPoint point : {QPoint(50, 20), QPoint(50, 60), QPoint(10, 60)}) {
+        QMouseEvent move(QEvent::MouseMove, QPointF(point), view.mapToGlobal(QPointF(point)),
+                         Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+        QApplication::sendEvent(&view, &move);
+    }
+    QTest::mouseRelease(&view, Qt::LeftButton, Qt::NoModifier, QPoint(10, 60));
+    QCOMPARE(finished.count(), 1);
+    const auto outline = finished.at(0).at(0).value<QPolygonF>();
+    QCOMPARE(outline.size(), 4);
+    QCOMPARE(outline.at(0), QPointF(20.0, 40.0));
+    QCOMPARE(outline.at(2), QPointF(100.0, 120.0));
+    view.setLassoMode(false);
+    QVERIFY(!view.isLassoMode());
+}
+
+void PhotoViewTest::aShortLassoIsIgnored() {
+    PhotoView view;
+    view.resize(400, 200);
+    QImage image(400, 200, QImage::Format_RGB32);
+    image.fill(Qt::gray);
+    view.setImage(image);
+    view.setLassoMode(true);
+    QSignalSpy finished(&view, &PhotoView::lassoFinished);
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, QPoint(10, 20));
+    QCOMPARE(finished.count(), 0);
+}
+
+void PhotoViewTest::rightButtonStillPansInLassoMode() {
+    PhotoView view;
+    view.resize(400, 200);
+    QImage image(400, 200, QImage::Format_RGB32);
+    image.fill(Qt::gray);
+    view.setImage(image);
+    view.setLassoMode(true);
+    const QPointF before = view.offset();
+    QTest::mousePress(&view, Qt::RightButton, Qt::NoModifier, QPoint(10, 20));
+    QMouseEvent move(QEvent::MouseMove, QPointF(30, 20), view.mapToGlobal(QPointF(30, 20)),
+                     Qt::NoButton, Qt::RightButton, Qt::NoModifier);
+    QApplication::sendEvent(&view, &move);
+    QTest::mouseRelease(&view, Qt::RightButton, Qt::NoModifier, QPoint(30, 20));
+    QCOMPARE(view.offset().x(), before.x() + 20.0);
+}
+
+void PhotoViewTest::aClickReportsItsImagePoint() {
+    PhotoView view;
+    view.resize(400, 200);
+    QImage image(800, 400, QImage::Format_RGB32);
+    image.fill(Qt::gray);
+    view.setImage(image);
+    QSignalSpy clicked(&view, &PhotoView::imageClicked);
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, QPoint(10, 20));
+    QCOMPARE(clicked.count(), 1);
+    QCOMPARE(clicked.at(0).at(0).toPointF(), QPointF(20.0, 40.0));
+}
+
+void PhotoViewTest::aDragIsNotAClick() {
+    PhotoView view;
+    view.resize(400, 200);
+    QImage image(400, 200, QImage::Format_RGB32);
+    image.fill(Qt::gray);
+    view.setImage(image);
+    QSignalSpy clicked(&view, &PhotoView::imageClicked);
+    QTest::mousePress(&view, Qt::LeftButton, Qt::NoModifier, QPoint(10, 20));
+    QMouseEvent move(QEvent::MouseMove, QPointF(60, 20), view.mapToGlobal(QPointF(60, 20)),
+                     Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(&view, &move);
+    QTest::mouseRelease(&view, Qt::LeftButton, Qt::NoModifier, QPoint(60, 20));
+    QCOMPARE(clicked.count(), 0);
+}
+
+void PhotoViewTest::outlinesAreDrawnOverTheImage() {
+    PhotoView view;
+    view.resize(400, 200);
+    QImage image(400, 200, QImage::Format_RGB32);
+    image.fill(Qt::black);
+    view.setImage(image);
+    std::vector<QPolygonF> outlines;
+    outlines.push_back(QPolygonF{QPointF(50, 50), QPointF(150, 50), QPointF(150, 150)});
+    view.setOutlines(std::move(outlines), 0);
+    const QImage grabbed = view.grab().toImage();
+    QVERIFY(qRed(grabbed.pixel(100, 50)) > 100);
+    QCOMPARE(qRed(grabbed.pixel(300, 100)), 0);
 }
 
 QTEST_MAIN(PhotoViewTest)

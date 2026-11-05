@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <exception>
 
+#include "stitch/decisions.hpp"
 #include "stitch/pose_file.hpp"
 #include "stitch/stitcher.hpp"
 
@@ -46,7 +47,19 @@ int run(int argc, char* argv[]) {
         err << result.error << Qt::endl;
         return 1;
     }
-    if (!result.panorama.save(arguments.at(2), nullptr, 95)) {
+    const auto decisions =
+        streetpano::stitch::readDecisions(streetpano::stitch::decisionsPathFor(arguments.at(0)));
+    if (!decisions.decisions.has_value()) {
+        err << decisions.error << Qt::endl;
+        return 1;
+    }
+    QStringList patchWarnings;
+    const QImage finished = streetpano::stitch::withPatches(
+        result, QDir(arguments.at(1)), decisions.decisions->patches, patchWarnings);
+    for (const QString& warning : patchWarnings) {
+        err << warning << Qt::endl;
+    }
+    if (!streetpano::stitch::savePanorama(finished, arguments.at(2))) {
         err << "Couldn't write " << arguments.at(2) << Qt::endl;
         return 1;
     }
