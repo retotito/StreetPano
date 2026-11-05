@@ -393,6 +393,7 @@ void StitcherTest::markingAnAreaSavesADecision() {
     QVERIFY(stitchInWindow(window, street));
     QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
     QVERIFY(window.isShowingPanorama());
+    QVERIFY(window.stitchMessage().contains(QStringLiteral("100% detail")));
     QVERIFY(window.markArea(squareAt(window.panorama())));
     QCOMPARE(window.areaCount(), 1);
     QCOMPARE(window.selectedArea(), 0);

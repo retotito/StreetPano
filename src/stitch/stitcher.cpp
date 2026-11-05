@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "core/seam_match.hpp"
@@ -192,7 +193,7 @@ StitchResult stitchPanorama(const PoseFile& poses, const QDir& photoFolder,
     // Keeps its alpha, because brightness matching and patches need to know what's empty.
     result.base = std::move(canvas);
     result.panorama = result.base;
-    result.surface = surface;
+    result.surface = std::move(surface);
     result.plan = plan;
     result.poses = std::move(usable);
     result.focalPixels = poses.focalPixels;

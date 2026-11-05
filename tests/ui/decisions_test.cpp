@@ -49,8 +49,9 @@ Decisions onePatch() {
 }  // namespace
 
 void DecisionsTest::keepsDecisionsBesideTheCameraPositions() {
-    QCOMPARE(decisionsPathFor(QStringLiteral("/a/b/poses.json")),
-             QStringLiteral("/a/b/decisions.json"));
+    const QTemporaryDir folder;
+    QCOMPARE(decisionsPathFor(folder.filePath(QStringLiteral("poses.json"))),
+             folder.filePath(QStringLiteral("decisions.json")));
 }
 
 void DecisionsTest::aMissingFileMeansNoEditsYet() {

@@ -262,10 +262,10 @@ void MainWindow::onStitchFinished() {
     stitchMessage_ = tr("Panorama: %1 x %2 px, %3% detail")
                          .arg(panorama_.width())
                          .arg(panorama_.height())
-                         .arg(qRound(result.scale * 100.0));
-    if (!result.warnings.isEmpty()) {
+                         .arg(qRound(stitched_.scale * 100.0));
+    if (!stitched_.warnings.isEmpty()) {
         stitchMessage_ +=
-            tr(", %n photo(s) with problems", nullptr, static_cast<int>(result.warnings.size()));
+            tr(", %n photo(s) with problems", nullptr, static_cast<int>(stitched_.warnings.size()));
     }
     showPanorama();
     updateStatus();
