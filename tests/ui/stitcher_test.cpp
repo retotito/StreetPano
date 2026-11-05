@@ -71,18 +71,18 @@ struct Street {
 
 // Compares a panorama with the true facade colours, ignoring the outermost pixels.
 double meanError(const QImage& panorama, const PoseFile& poses, const StitchOptions& options) {
-    const auto frame = *streetpano::core::fitStreetFrame(poses.poses, poses.points).frame;
+    const auto surface = *streetpano::core::fitFacadeSurface(poses.poses, poses.points).surface;
     const auto plan =
-        *streetpano::core::makeStitchPlan(frame, poses.poses, poses.focalPixels,
+        *streetpano::core::makeStitchPlan(surface, poses.poses, poses.focalPixels,
                                           StreetFixture::kWidth, StreetFixture::kHeight, options)
              .plan;
     double total = 0.0;
     int count = 0;
     for (int y = 4; y < panorama.height() - 4; ++y) {
         for (int x = 4; x < panorama.width() - 4; ++x) {
-            const double u = plan.leftOnPlane + (x + 0.5) * plan.unitsPerPixel;
-            const double v = plan.topOnPlane - (y + 0.5) * plan.unitsPerPixel;
-            const auto point = frame.origin + frame.right * u + frame.up * v;
+            const double u = plan.leftArc + (x + 0.5) * plan.unitsPerPixel;
+            const double v = plan.topHeight - (y + 0.5) * plan.unitsPerPixel;
+            const auto point = surface.pointAt(u, v);
             const QRgb truth = StreetFixture::facadeColor(point.x, point.y);
             const QRgb found = panorama.pixel(x, y);
             total += std::abs(qRed(truth) - qRed(found)) + std::abs(qGreen(truth) - qGreen(found)) +

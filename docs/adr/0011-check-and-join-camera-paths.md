@@ -49,6 +49,6 @@ about 2 GB.
   suggests that false matches across the gap still pull the scale. Filtering them
   would allow it.
 - A deliberate pause while shooting is seen as a break, then joined with a normal step.
-- Results still vary between runs, including the angle of the facade plane.
+- Camera positions still vary a little between runs.
 - This has been measured on one real street. Long streets may behave differently, and
   5 attempts will take longer on them.

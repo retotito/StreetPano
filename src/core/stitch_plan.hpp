@@ -7,7 +7,8 @@
 #include <string>
 #include <vector>
 
-#include "core/street_frame.hpp"
+#include "core/camera_pose.hpp"
+#include "core/facade_surface.hpp"
 
 namespace streetpano::core {
 
@@ -24,14 +25,14 @@ struct Strip {
     int xEnd = 0;
 };
 
-// Where the panorama sits on the facade plane, and which photo supplies each column.
+// Where the panorama sits on the facade surface, and which photo supplies each column.
 struct StitchPlan {
     int width = 0;
     int height = 0;
     double scale = 1.0;          // 1 means the photos' full detail.
     double unitsPerPixel = 0.0;  // On the facade, in the reconstruction's units.
-    double leftOnPlane = 0.0;
-    double topOnPlane = 0.0;
+    double leftArc = 0.0;
+    double topHeight = 0.0;
     std::vector<Strip> strips;
 };
 
@@ -42,8 +43,9 @@ struct PlanResult {
 
 // Gives each photo the columns closest to where its optical axis meets the facade. Straight
 // vertical seams are a first step: foreground objects will be visibly cut at them.
-[[nodiscard]] PlanResult makeStitchPlan(const StreetFrame& frame, std::span<const CameraPose> poses,
-                                        double focalPixels, int photoWidth, int photoHeight,
+[[nodiscard]] PlanResult makeStitchPlan(const FacadeSurface& surface,
+                                        std::span<const CameraPose> poses, double focalPixels,
+                                        int photoWidth, int photoHeight,
                                         const StitchOptions& options);
 
 // A photo in memory, as 32-bit 0xAARRGGBB pixels.
@@ -64,7 +66,7 @@ struct CanvasView {
 
 // Projects one photo onto the panorama and blends it across the seams. focalPixels must
 // match the size of the image passed in.
-void drawStrip(const StreetFrame& frame, const StitchPlan& plan, const Strip& strip,
+void drawStrip(const FacadeSurface& surface, const StitchPlan& plan, const Strip& strip,
                const CameraPose& pose, double focalPixels, const ImageView& photo,
                const CanvasView& canvas, int featherPixels);
 

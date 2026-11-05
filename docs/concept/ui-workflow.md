@@ -104,6 +104,10 @@ Export can also save the mask of generated pixels and a list of the decisions ma
 
 ## Design rules
 
+- **Automatic first, and the user decides.** Each step gives a good result without
+  input, and keeps its decisions as data that can be changed later without redoing
+  other work. The user can always point at an object, such as a damaged car or a
+  person, and tell the AI to [correct or remove it](foreground.md).
 - **Any order, nothing lost.** Every correction is a saved decision that can be
   undone. The tabs run from most to least disruptive, so working left to right
   avoids redoing work.

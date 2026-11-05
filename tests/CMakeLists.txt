@@ -9,7 +9,7 @@ add_executable(core_tests
     core/lru_cache_test.cpp
     core/photo_listing_test.cpp
     core/stitch_plan_test.cpp
-    core/street_frame_test.cpp)
+    core/facade_surface_test.cpp)
 target_link_libraries(core_tests PRIVATE streetpano_core Catch2::Catch2WithMain)
 add_test(NAME core_tests COMMAND core_tests)
 

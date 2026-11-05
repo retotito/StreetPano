@@ -4,7 +4,7 @@
 #include <optional>
 #include <vector>
 
-#include "core/street_frame.hpp"
+#include "core/camera_pose.hpp"
 
 namespace streetpano::stitch {
 

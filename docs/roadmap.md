@@ -39,9 +39,10 @@ flowchart LR
 - [x] Read focal length from photo metadata
 - [x] Test camera positions on real photos: 26 of 27 phone photos of a real street
   connect, with [checked paths and joined sections](adr/0011-check-and-join-camera-paths.md)
-- [ ] Make the facade plane stable, because its angle still varies between runs
-- [x] Fit one facade plane, with verticals from the average camera direction
-- [ ] Follow curved streets and different building setbacks
+- [x] [Follow curved streets and different building setbacks](adr/0012-facade-surface.md),
+  with verticals from the average camera direction
+- [ ] Let users correct the wall where the automatic distance is wrong
+- [ ] Reduce the wave in rooflines near trees
 - [ ] Choose a [licence-compatible graph cut](concept/ai-models.md)
 - [x] First stitch with straight seams and a short blend, shown in the app
 - [ ] Graph-cut seams and pyramid blending
