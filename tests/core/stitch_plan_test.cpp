@@ -7,10 +7,12 @@
 #include <vector>
 
 using Catch::Approx;
+using streetpano::core::brightnessGain;
 using streetpano::core::CameraPose;
 using streetpano::core::CanvasView;
 using streetpano::core::drawStrip;
 using streetpano::core::FacadeSurface;
+using streetpano::core::findSeam;
 using streetpano::core::ImageView;
 using streetpano::core::makeStitchPlan;
 using streetpano::core::Mat3;
@@ -189,9 +191,144 @@ TEST_CASE("a strip outside the canvas draws nothing") {
     const ImageView photo{photoPixels.data(), 64, 36, 64 * sizeof(std::uint32_t)};
     const CanvasView canvas{canvasPixels.data(), plan.width, plan.height,
                             static_cast<std::size_t>(plan.width) * sizeof(std::uint32_t)};
-    streetpano::core::Strip outside{0, plan.width + 100, plan.width + 200};
+    streetpano::core::Strip outside{0, plan.width + 1000, plan.width + 1100};
     drawStrip(surface, plan, outside, poses[0], kFocal, photo, canvas, 0);
     for (const std::uint32_t pixel : canvasPixels) {
         REQUIRE(pixel == 0U);
+    }
+}
+
+namespace {
+
+constexpr int kSeamWidth = 60;
+constexpr int kSeamHeight = 40;
+
+struct SeamScene {
+    std::vector<std::uint32_t> existing =
+        std::vector<std::uint32_t>(kSeamWidth * kSeamHeight, 0xFF808080U);
+    std::vector<std::uint32_t> incoming =
+        std::vector<std::uint32_t>(kSeamWidth * kSeamHeight, 0xFF808080U);
+
+    [[nodiscard]] CanvasView canvas() {
+        return {existing.data(), kSeamWidth, kSeamHeight, kSeamWidth * sizeof(std::uint32_t)};
+    }
+    [[nodiscard]] ImageView region() const {
+        return {incoming.data(), kSeamWidth, kSeamHeight, kSeamWidth * sizeof(std::uint32_t)};
+    }
+    // Something that's in the new photo only, such as a car seen from another place.
+    void paintIncoming(int left, int right, int top, int bottom, std::uint32_t colour) {
+        for (int y = top; y < bottom; ++y) {
+            for (int x = left; x < right; ++x) {
+                incoming[static_cast<std::size_t>(y * kSeamWidth + x)] = colour;
+            }
+        }
+    }
+    void paintExisting(int left, int right, int top, int bottom, std::uint32_t colour) {
+        for (int y = top; y < bottom; ++y) {
+            for (int x = left; x < right; ++x) {
+                existing[static_cast<std::size_t>(y * kSeamWidth + x)] = colour;
+            }
+        }
+    }
+};
+
+}  // namespace
+
+TEST_CASE("a seam stays at its preferred place when the photos agree") {
+    SeamScene scene;
+    const auto seam = findSeam(scene.canvas(), scene.region(), 0, 30, 30);
+    REQUIRE(seam.size() == kSeamHeight);
+    for (const int column : seam) {
+        REQUIRE(std::abs(column - 30) <= 1);
+    }
+}
+
+TEST_CASE("a seam goes around an object that the photos disagree about") {
+    SeamScene scene;
+    scene.paintIncoming(22, 38, 10, 30, 0xFF102030U);
+    const auto seam = findSeam(scene.canvas(), scene.region(), 0, 30, 30);
+    for (int y = 10; y < 30; ++y) {
+        const int column = seam[static_cast<std::size_t>(y)];
+        REQUIRE((column <= 22 || column >= 38));
+    }
+}
+
+TEST_CASE("a seam moves by at most one column per row") {
+    SeamScene scene;
+    scene.paintIncoming(25, 45, 15, 25, 0xFF102030U);
+    const auto seam = findSeam(scene.canvas(), scene.region(), 0, 30, 30);
+    for (std::size_t y = 1; y < seam.size(); ++y) {
+        REQUIRE(std::abs(seam[y] - seam[y - 1]) <= 1);
+    }
+}
+
+TEST_CASE("a seam avoids where the new photo has no pixels") {
+    SeamScene scene;
+    scene.paintIncoming(0, 40, 0, kSeamHeight, 0U);
+    const auto seam = findSeam(scene.canvas(), scene.region(), 0, 30, 30);
+    for (const int column : seam) {
+        REQUIRE(column >= 40);
+    }
+}
+
+TEST_CASE("a seam columns are in canvas coordinates") {
+    SeamScene scene;
+    std::vector<std::uint32_t> wider(120 * kSeamHeight, 0xFF808080U);
+    const CanvasView canvas{wider.data(), 120, kSeamHeight, 120 * sizeof(std::uint32_t)};
+    const auto seam = findSeam(canvas, scene.region(), 50, 80, 30);
+    for (const int column : seam) {
+        REQUIRE(std::abs(column - 80) <= 1);
+    }
+}
+
+TEST_CASE("a darker photo is brightened to match") {
+    SeamScene scene;
+    scene.paintIncoming(0, kSeamWidth, 0, kSeamHeight, 0xFF707070U);
+    REQUIRE(brightnessGain(scene.canvas(), scene.region(), 0) == Approx(128.0 / 112.0));
+}
+
+TEST_CASE("an object in only one photo doesn't change its brightness") {
+    SeamScene scene;
+    scene.paintIncoming(10, 20, 10, 20, 0xFF000000U);
+    REQUIRE(brightnessGain(scene.canvas(), scene.region(), 0) == Approx(1.0));
+}
+
+TEST_CASE("brightness matching stays gentle") {
+    SeamScene scene;
+    scene.paintIncoming(0, kSeamWidth, 0, kSeamHeight, 0xFF202020U);
+    REQUIRE(brightnessGain(scene.canvas(), scene.region(), 0) == Approx(1.25));
+    scene.paintIncoming(0, kSeamWidth, 0, kSeamHeight, 0xFFFFFFFFU);
+    REQUIRE(brightnessGain(scene.canvas(), scene.region(), 0) == Approx(0.8));
+}
+
+TEST_CASE("brightness is left alone without an overlap or on a black photo") {
+    SeamScene scene;
+    scene.paintExisting(0, kSeamWidth, 0, kSeamHeight, 0U);
+    REQUIRE(brightnessGain(scene.canvas(), scene.region(), 0) == 1.0);
+    SeamScene black;
+    black.paintIncoming(0, kSeamWidth, 0, kSeamHeight, 0xFF000000U);
+    REQUIRE(brightnessGain(black.canvas(), black.region(), 0) == 1.0);
+}
+
+TEST_CASE("the new photo takes over from the seam, with a blend across it") {
+    const auto surface = flatWall();
+    const auto poses = street(2);
+    const auto result = makeStitchPlan(surface, poses, kFocal, 64, 36, {});
+    REQUIRE(result.plan.has_value());
+    const auto& plan = *result.plan;
+    REQUIRE(plan.strips.size() == 2);
+    const std::vector<std::uint32_t> first(64 * 36, 0xFF808080U);
+    const std::vector<std::uint32_t> second(64 * 36, 0xFF808080U);
+    std::vector<std::uint32_t> pixels(
+        static_cast<std::size_t>(plan.width) * static_cast<std::size_t>(plan.height), 0U);
+    const CanvasView canvas{pixels.data(), plan.width, plan.height,
+                            static_cast<std::size_t>(plan.width) * sizeof(std::uint32_t)};
+    for (std::size_t index = 0; index < 2; ++index) {
+        const ImageView photo{(index == 0 ? first : second).data(), 64, 36,
+                              64 * sizeof(std::uint32_t)};
+        drawStrip(surface, plan, plan.strips[index], poses[index], kFocal, photo, canvas, 4);
+    }
+    for (const std::uint32_t pixel : pixels) {
+        REQUIRE((pixel == 0U || pixel == 0xFF808080U));
     }
 }

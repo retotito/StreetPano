@@ -13,6 +13,7 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Seams that go around objects, and brightness matching between photos
 - Straighter facades: the wall is fitted as lines, and adjusted until neighbouring photos
   agree at each seam
 - A facade surface that follows the buildings along the street and is laid out as a

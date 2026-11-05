@@ -61,3 +61,4 @@ nav:
       - "0010: C++ and Qt for the application": adr/0010-cpp-and-qt.md
       - "0011: Check camera paths and join sections": adr/0011-check-and-join-camera-paths.md
       - "0012: A facade surface instead of one plane": adr/0012-facade-surface.md
+      - "0013: Cheapest-path seams instead of a graph cut": adr/0013-cheapest-path-seams.md

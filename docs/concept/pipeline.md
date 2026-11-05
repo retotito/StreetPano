@@ -29,18 +29,16 @@ The first version works from end to end, using only some of these steps:
 
 ![A first panorama of a synthetic street, with a sharp facade and squeezed cars](../assets/first-panorama.jpg)
 
-- **Built:** camera positions, a facade surface that follows the street, and straight seams with a short blend.
-- **Not built yet:** lens correction, RAW, graph-cut seams, object handling, colour
-  correction and pyramid blending.
+- **Built:** camera positions, a facade surface that follows the street, seams that go around objects, and brightness matching.
+- **Not built yet:** lens correction, RAW, marking objects to keep or remove, and pyramid
+  blending.
 
-The picture above is from a synthetic street, and the flaws in it are expected: cars and
-trees are squeezed and smeared, and the road is blurred, because they aren't on the
-facade.
+The picture above is from an earlier synthetic street, with straight seams.
 
-On a real street of 27 phone photos, the facades and their lettering line up and the
-strip stays straight, with the same flaws on foreground objects. Dark patches also appear
-on the road, from parked car roofs close to the camera, and some rooflines keep a gentle
-bow. Lens distortion isn't corrected yet.
+On a real street of 27 phone photos, the facades and their lettering mostly line up, the
+strip stays straight, and most cars stay whole. The seams also
+[edit the scene without asking](../adr/0013-cheapest-path-seams.md), removing or repeating
+some objects, and some rooflines keep a gentle bow. Lens distortion isn't corrected yet.
 
 ## Steps
 
@@ -121,13 +119,15 @@ thin or moving objects using real pixels.
 
 ### 6. Choose seams
 
-A graph cut chooses the source photo for each pixel, balancing three costs:
+For each photo, a [cheapest path](../adr/0013-cheapest-path-seams.md) from top to bottom
+decides where it takes over from what's already drawn, balancing these costs:
 
-- Prefer pixels that aren't foreground.
-- Prefer seams where neighbouring photos agree.
-- Keep every pixel of a "keep whole" object from a single photo.
+- Prefer seams where the photos agree.
+- Prefer seams near the middle of the strip, where views are less oblique.
+- Later, keep every pixel of a "keep whole" object from a single photo, and avoid pixels
+  marked as foreground.
 
-![Straight seams break a car, while graph-cut seams keep it whole](../assets/seams.svg)
+![Straight seams break a car, while seams that follow agreement keep it whole](../assets/seams.svg)
 
 ### 7. Align locally
 

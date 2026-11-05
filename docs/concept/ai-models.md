@@ -118,13 +118,10 @@ check again before adding a dependency.
 | [Pillow](https://github.com/python-pillow/Pillow) | MIT-CMU | In use, in developer tools only. |
 | [PyMaxflow](https://github.com/pmneila/PyMaxflow) | **GPL** | **Avoid as a required dependency.** See below. |
 
-## Open question: graph-cut library
+## Seams without a graph-cut library
 
-PyMaxflow is GPL, which conflicts with the plan to distribute StreetPano under
-Apache-2.0 if it's a required dependency. Options to evaluate:
-
-1. OpenCV's graph-cut seam finder, which only handles pairs of images.
-2. Our own max-flow implementation in C++, which isn't a large algorithm.
-3. PyMaxflow as a research-only developer tool, to compare results.
+PyMaxflow is GPL, which conflicts with distributing StreetPano under Apache-2.0 if it's a
+required dependency. StreetPano uses its own
+[cheapest-path seams](../adr/0013-cheapest-path-seams.md) instead, which need no library.
 
 See the [licensing decision record](../adr/0006-code-and-model-licensing.md).
