@@ -4,8 +4,9 @@ add_library(streetpano_core STATIC
     core/photo_listing.hpp
     core/stitch_plan.cpp
     core/stitch_plan.hpp
-    core/street_frame.cpp
-    core/street_frame.hpp
+    core/camera_pose.hpp
+    core/facade_surface.cpp
+    core/facade_surface.hpp
     core/vec3.hpp)
 target_include_directories(streetpano_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(streetpano_core PUBLIC streetpano_options)

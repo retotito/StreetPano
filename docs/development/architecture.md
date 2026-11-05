@@ -72,7 +72,7 @@ docs/                This documentation
 src/core/
 ├── lru_cache        Memory-budgeted cache (exists)
 ├── photo_listing    Finding photos in a folder (exists)
-├── street_frame     Fitting the facade plane (exists)
+├── facade_surface   The wall that follows the buildings (exists)
 ├── stitch_plan      Panorama layout and drawing strips (exists)
 ├── project/         Project files, decisions and masks
 ├── ingest/          RAW and JPEG loading, lens correction

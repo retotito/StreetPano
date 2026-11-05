@@ -29,15 +29,18 @@ The first version works from end to end, using only some of these steps:
 
 ![A first panorama of a synthetic street, with a sharp facade and squeezed cars](../assets/first-panorama.jpg)
 
-- **Built:** camera positions, a single facade plane, and straight seams with a short blend.
+- **Built:** camera positions, a facade surface that follows the street, and straight seams with a short blend.
 - **Not built yet:** lens correction, RAW, graph-cut seams, object handling, colour
   correction and pyramid blending.
 
-On the facade, a panorama from COLMAP's camera positions differs from one using exact
-positions by 1.26 out of 255, with no shift. The expected flaws are visible above: cars
-and trees are squeezed and smeared, and the road is blurred, because they aren't on the
-facade plane. Real photos haven't been tested yet, and lens distortion will probably
-show at the seams.
+The picture above is from a synthetic street, and the flaws in it are expected: cars and
+trees are squeezed and smeared, and the road is blurred, because they aren't on the
+facade.
+
+On a real street of 27 phone photos, the facades and their lettering line up and the
+strip stays straight, with the same flaws on foreground objects. Dark patches also appear
+on the road, from parked car roofs close to the camera, and rooflines wave slightly near
+trees. Lens distortion isn't corrected yet.
 
 ## Steps
 
@@ -98,9 +101,10 @@ See [Geometry correction](geometry-correction.md).
 
 ### 4. Build facade surface
 
-Fit a plane to each facade section and join the planes along the street. This
-surface is the panorama's canvas. Curved streets and buildings at different
-setbacks are the main unknowns here.
+At each camera, measure the distance to the buildings from the 3D points above camera
+height, and join those distances into a smooth wall that follows the street. Laying
+that wall out flat gives the panorama's canvas. See the
+[decision record](../adr/0012-facade-surface.md).
 
 ### 5. Map foreground objects
 

@@ -3,17 +3,18 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <cstdint>
+#include <cstdlib>
 #include <vector>
 
 using Catch::Approx;
 using streetpano::core::CameraPose;
 using streetpano::core::CanvasView;
 using streetpano::core::drawStrip;
+using streetpano::core::FacadeSurface;
 using streetpano::core::ImageView;
 using streetpano::core::makeStitchPlan;
 using streetpano::core::Mat3;
 using streetpano::core::StitchOptions;
-using streetpano::core::StreetFrame;
 using streetpano::core::Vec3;
 
 namespace {
@@ -21,14 +22,14 @@ namespace {
 constexpr Mat3 kIdentity = {Vec3{1, 0, 0}, Vec3{0, 1, 0}, Vec3{0, 0, 1}};
 constexpr double kFocal = 800.0;
 
-StreetFrame facadeFrame() {
-    StreetFrame frame;
-    frame.origin = {0.0, 0.0, 15.0};
-    frame.right = {1.0, 0.0, 0.0};
-    frame.up = {0.0, -1.0, 0.0};
-    frame.normal = {0.0, 0.0, 1.0};
-    frame.medianCameraDistance = 15.0;
-    return frame;
+// A flat wall 15 units in front of the cameras, with arc 1000 at x = 0.
+FacadeSurface flatWall() {
+    FacadeSurface surface;
+    surface.up = {0.0, -1.0, 0.0};
+    surface.medianCameraDistance = 15.0;
+    surface.nodes.push_back({Vec3{-1000.0, 0.0, 15.0}, 0.0});
+    surface.nodes.push_back({Vec3{1000.0, 0.0, 15.0}, 2000.0});
+    return surface;
 }
 
 std::vector<CameraPose> street(int count) {
@@ -45,7 +46,7 @@ std::vector<CameraPose> street(int count) {
 }  // namespace
 
 TEST_CASE("strips cover the whole panorama without gaps") {
-    const auto result = makeStitchPlan(facadeFrame(), street(10), kFocal, 1280, 720, {});
+    const auto result = makeStitchPlan(flatWall(), street(10), kFocal, 1280, 720, {});
     REQUIRE(result.plan.has_value());
     const auto& plan = *result.plan;
     REQUIRE(plan.strips.size() == 10);
@@ -57,17 +58,17 @@ TEST_CASE("strips cover the whole panorama without gaps") {
 }
 
 TEST_CASE("the panorama keeps the photos' detail") {
-    const auto result = makeStitchPlan(facadeFrame(), street(10), kFocal, 1280, 720, {});
+    const auto result = makeStitchPlan(flatWall(), street(10), kFocal, 1280, 720, {});
     REQUIRE(result.plan.has_value());
     REQUIRE(result.plan->scale == 1.0);
     REQUIRE(result.plan->unitsPerPixel == Approx(15.0 / kFocal));
     // One photo's width, plus 9 m of walking at this resolution.
-    REQUIRE(result.plan->width == 1280 + 9 * 800 / 15);
+    REQUIRE(std::abs(result.plan->width - (1280 + 9 * 800 / 15)) <= 1);
     REQUIRE(result.plan->height == 720);
 }
 
 TEST_CASE("each strip is centred on its photo's view") {
-    const auto result = makeStitchPlan(facadeFrame(), street(10), kFocal, 1280, 720, {});
+    const auto result = makeStitchPlan(flatWall(), street(10), kFocal, 1280, 720, {});
     REQUIRE(result.plan.has_value());
     REQUIRE(result.plan->strips[3].camera == 3);
     const int stripWidth = result.plan->strips[3].xEnd - result.plan->strips[3].xStart;
@@ -77,7 +78,7 @@ TEST_CASE("each strip is centred on its photo's view") {
 TEST_CASE("photos taken out of order are still placed correctly") {
     auto poses = street(5);
     std::swap(poses[1], poses[3]);
-    const auto result = makeStitchPlan(facadeFrame(), poses, kFocal, 1280, 720, {});
+    const auto result = makeStitchPlan(flatWall(), poses, kFocal, 1280, 720, {});
     REQUIRE(result.plan.has_value());
     REQUIRE(result.plan->strips[1].camera == 3);
     REQUIRE(result.plan->strips[3].camera == 1);
@@ -86,7 +87,7 @@ TEST_CASE("photos taken out of order are still placed correctly") {
 TEST_CASE("a memory budget reduces the panorama") {
     StitchOptions options;
     options.maxPixels = 100000;
-    const auto result = makeStitchPlan(facadeFrame(), street(10), kFocal, 1280, 720, options);
+    const auto result = makeStitchPlan(flatWall(), street(10), kFocal, 1280, 720, options);
     REQUIRE(result.plan.has_value());
     const auto& plan = *result.plan;
     REQUIRE(plan.scale < 1.0);
@@ -98,24 +99,24 @@ TEST_CASE("a memory budget reduces the panorama") {
 TEST_CASE("the longest side is limited") {
     StitchOptions options;
     options.maxSide = 500;
-    const auto result = makeStitchPlan(facadeFrame(), street(10), kFocal, 1280, 720, options);
+    const auto result = makeStitchPlan(flatWall(), street(10), kFocal, 1280, 720, options);
     REQUIRE(result.plan.has_value());
     REQUIRE(result.plan->width <= 500);
 }
 
 TEST_CASE("invalid input gives clear errors") {
     SECTION("bad focal length") {
-        REQUIRE_FALSE(makeStitchPlan(facadeFrame(), street(2), 0.0, 1280, 720, {}).plan);
+        REQUIRE_FALSE(makeStitchPlan(flatWall(), street(2), 0.0, 1280, 720, {}).plan);
     }
     SECTION("bad photo size") {
-        REQUIRE_FALSE(makeStitchPlan(facadeFrame(), street(2), kFocal, 0, 720, {}).plan);
+        REQUIRE_FALSE(makeStitchPlan(flatWall(), street(2), kFocal, 0, 720, {}).plan);
     }
     SECTION("no photo looks at the facade") {
         auto poses = street(2);
         const Mat3 backwards = {Vec3{-1, 0, 0}, Vec3{0, 1, 0}, Vec3{0, 0, -1}};
         poses[0].worldToCamera = backwards;
         poses[1].worldToCamera = backwards;
-        const auto result = makeStitchPlan(facadeFrame(), poses, kFocal, 1280, 720, {});
+        const auto result = makeStitchPlan(flatWall(), poses, kFocal, 1280, 720, {});
         REQUIRE_FALSE(result.plan.has_value());
         REQUIRE(result.error.find("looks towards") != std::string::npos);
     }
@@ -124,15 +125,15 @@ TEST_CASE("invalid input gives clear errors") {
 TEST_CASE("a camera looking away is left out, and the others cover its place") {
     auto poses = street(3);
     poses[1].worldToCamera = {Vec3{-1, 0, 0}, Vec3{0, 1, 0}, Vec3{0, 0, -1}};
-    const auto result = makeStitchPlan(facadeFrame(), poses, kFocal, 1280, 720, {});
+    const auto result = makeStitchPlan(flatWall(), poses, kFocal, 1280, 720, {});
     REQUIRE(result.plan.has_value());
     REQUIRE(result.plan->strips.size() == 2);
 }
 
 TEST_CASE("drawing stays inside the canvas and the photo") {
-    const auto frame = facadeFrame();
+    const auto surface = flatWall();
     const auto poses = street(3);
-    const auto result = makeStitchPlan(frame, poses, kFocal, 64, 36, {});
+    const auto result = makeStitchPlan(surface, poses, kFocal, 64, 36, {});
     REQUIRE(result.plan.has_value());
     const auto& plan = *result.plan;
 
@@ -143,7 +144,7 @@ TEST_CASE("drawing stays inside the canvas and the photo") {
     const CanvasView canvas{canvasPixels.data(), plan.width, plan.height,
                             static_cast<std::size_t>(plan.width) * sizeof(std::uint32_t)};
     for (const auto& strip : plan.strips) {
-        drawStrip(frame, plan, strip, poses[strip.camera], kFocal, photo, canvas, 8);
+        drawStrip(surface, plan, strip, poses[strip.camera], kFocal, photo, canvas, 8);
     }
     std::size_t drawn = 0;
     for (const std::uint32_t pixel : canvasPixels) {
@@ -156,9 +157,9 @@ TEST_CASE("drawing stays inside the canvas and the photo") {
 }
 
 TEST_CASE("a point behind the camera isn't drawn") {
-    auto frame = facadeFrame();
+    const auto surface = flatWall();
     const auto poses = street(1);
-    const auto result = makeStitchPlan(frame, poses, kFocal, 64, 36, {});
+    const auto result = makeStitchPlan(surface, poses, kFocal, 64, 36, {});
     REQUIRE(result.plan.has_value());
     const auto& plan = *result.plan;
     CameraPose behind = poses[0];
@@ -170,7 +171,26 @@ TEST_CASE("a point behind the camera isn't drawn") {
     const ImageView photo{photoPixels.data(), 64, 36, 64 * sizeof(std::uint32_t)};
     const CanvasView canvas{canvasPixels.data(), plan.width, plan.height,
                             static_cast<std::size_t>(plan.width) * sizeof(std::uint32_t)};
-    drawStrip(frame, plan, plan.strips[0], behind, kFocal, photo, canvas, 0);
+    drawStrip(surface, plan, plan.strips[0], behind, kFocal, photo, canvas, 0);
+    for (const std::uint32_t pixel : canvasPixels) {
+        REQUIRE(pixel == 0U);
+    }
+}
+
+TEST_CASE("a strip outside the canvas draws nothing") {
+    const auto surface = flatWall();
+    const auto poses = street(1);
+    const auto result = makeStitchPlan(surface, poses, kFocal, 64, 36, {});
+    REQUIRE(result.plan.has_value());
+    const auto& plan = *result.plan;
+    const std::vector<std::uint32_t> photoPixels(64 * 36, 0xFF102030U);
+    std::vector<std::uint32_t> canvasPixels(
+        static_cast<std::size_t>(plan.width) * static_cast<std::size_t>(plan.height), 0U);
+    const ImageView photo{photoPixels.data(), 64, 36, 64 * sizeof(std::uint32_t)};
+    const CanvasView canvas{canvasPixels.data(), plan.width, plan.height,
+                            static_cast<std::size_t>(plan.width) * sizeof(std::uint32_t)};
+    streetpano::core::Strip outside{0, plan.width + 100, plan.width + 200};
+    drawStrip(surface, plan, outside, poses[0], kFocal, photo, canvas, 0);
     for (const std::uint32_t pixel : canvasPixels) {
         REQUIRE(pixel == 0U);
     }

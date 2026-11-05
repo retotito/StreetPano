@@ -13,6 +13,8 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- A facade surface that follows the buildings along the street and is laid out as a
+  straight panorama, replacing the single facade plane
 - Camera positions on real streets: each result is checked as a walk, split where it
   breaks, and joined again using neighbouring photos
 - First stitching: `scripts/stitch.sh` takes a folder of photos through to a panorama,

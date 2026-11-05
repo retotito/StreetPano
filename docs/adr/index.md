@@ -17,3 +17,4 @@ new record that replaces it.
 | [0009](0009-web-ui-stack.md) | Svelte and FastAPI for the interface | Replaced by 0010 |
 | [0010](0010-cpp-and-qt.md) | C++ and Qt for the application | Accepted |
 | [0011](0011-check-and-join-camera-paths.md) | Check camera paths and join sections | Accepted |
+| [0012](0012-facade-surface.md) | A facade surface instead of one plane | Accepted |

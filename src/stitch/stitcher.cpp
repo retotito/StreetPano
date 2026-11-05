@@ -47,14 +47,14 @@ StitchResult stitchPanorama(const PoseFile& poses, const QDir& photoFolder,
         return result;
     }
 
-    const core::FrameResult frameResult = core::fitStreetFrame(usable, poses.points);
-    if (!frameResult.frame.has_value()) {
-        result.error = QString::fromStdString(frameResult.error);
+    const core::SurfaceResult surfaceResult = core::fitFacadeSurface(usable, poses.points);
+    if (!surfaceResult.surface.has_value()) {
+        result.error = QString::fromStdString(surfaceResult.error);
         return result;
     }
-    const core::StreetFrame& frame = *frameResult.frame;
+    const core::FacadeSurface& surface = *surfaceResult.surface;
     core::PlanResult planResult = core::makeStitchPlan(
-        frame, usable, poses.focalPixels, photoSize.width(), photoSize.height(), options);
+        surface, usable, poses.focalPixels, photoSize.width(), photoSize.height(), options);
     if (!planResult.plan.has_value()) {
         result.error = QString::fromStdString(planResult.error);
         return result;
@@ -107,7 +107,7 @@ StitchResult stitchPanorama(const PoseFile& poses, const QDir& photoFolder,
                 constPhoto.height(), static_cast<std::size_t>(constPhoto.bytesPerLine())};
             const double focal =
                 decodeFocal * constPhoto.width() / static_cast<double>(decodeSize.width());
-            core::drawStrip(frame, plan, strip, pose, focal, view, canvasView,
+            core::drawStrip(surface, plan, strip, pose, focal, view, canvasView,
                             options.featherPixels);
         }
         ++done;

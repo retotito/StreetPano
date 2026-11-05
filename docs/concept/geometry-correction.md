@@ -41,6 +41,8 @@ The canvas is a surface that follows the facades along the walk. Laying that sur
 out flat, like unrolling a label from a bottle, gives the straight panorama. The
 facades keep their proportions, and the bend becomes distance along the strip.
 
+Straight is built. The other two modes are planned.
+
 | Mode | Result | Downside |
 |---|---|---|
 | **Straight** (default) | One straight strip, with rooflines level along each facade | The bend no longer shows, so directions and overall distances aren't true |
