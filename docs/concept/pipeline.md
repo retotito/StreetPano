@@ -23,6 +23,22 @@ flowchart TD
     V --> U
 ```
 
+## Current state
+
+The first version works from end to end, using only some of these steps:
+
+![A first panorama of a synthetic street, with a sharp facade and squeezed cars](../assets/first-panorama.jpg)
+
+- **Built:** camera positions, a single facade plane, and straight seams with a short blend.
+- **Not built yet:** lens correction, RAW, graph-cut seams, object handling, colour
+  correction and pyramid blending.
+
+On the facade, a panorama from COLMAP's camera positions differs from one using exact
+positions by 1.26 out of 255, with no shift. The expected flaws are visible above: cars
+and trees are squeezed and smeared, and the road is blurred, because they aren't on the
+facade plane. Real photos haven't been tested yet, and lens distortion will probably
+show at the seams.
+
 ## Steps
 
 ### 1. Develop and correct lens
@@ -57,6 +73,10 @@ Results from COLMAP with a fixed focal length, on 40 m synthetic streets at 1280
 | 3 m spacing | 0.030° | 0.9 cm | 14.99 m |
 | 5 m spacing | 0.021° | 0.9 cm | 15.00 m |
 | 8 m spacing | 0.079° | 2.3 cm | 15.00 m |
+
+COLMAP's default settings are made for unordered photo collections. Limiting images to
+2000 px and 5000 features, and matching only the 8 nearest photos, took 16 photos of 12 MP
+from 417 s to 9.5 s on an 8 GB laptop, with the same accuracy on a synthetic street.
 
 These results are the best case. The scenes have perfect lenses, a known focal
 length and unique textures, without repeating windows or changing light. Real photos

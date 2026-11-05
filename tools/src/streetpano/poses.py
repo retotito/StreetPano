@@ -19,6 +19,26 @@ FloatArray = NDArray[np.float64]
 # COLMAP cameras have Y pointing down. Synthetic cameras have Y pointing up.
 _FLIP_Y = np.diag([1.0, -1.0, 1.0])
 _PHOTO_SUFFIXES = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
+_EXIF_ORIENTATION = 0x0112
+_EXIF_IFD = 0x8769
+_EXIF_FOCAL_35MM = 0xA405
+_FULL_FRAME_DIAGONAL_MM = 43.27
+_UP_BY_ORIENTATION: dict[int, tuple[float, float, float]] = {
+    1: (0.0, -1.0, 0.0),
+    3: (0.0, 1.0, 0.0),
+    6: (-1.0, 0.0, 0.0),
+    8: (1.0, 0.0, 0.0),
+}
+_MAX_POINTS_IN_FILE = 20000
+
+# COLMAP's defaults are made for unordered photo collections. Photos taken along a
+# street only need to match their neighbours. These settings took 16 photos of 12 MP
+# from 417 s to 9.5 s on an 8 GB laptop, with the same accuracy on a synthetic
+# street. They sit above the lowest values that worked, because real facades are
+# harder to match.
+_MAX_IMAGE_SIZE_PX = 2000
+_MAX_FEATURES = 5000
+_NEIGHBOUR_PHOTOS = 8
 
 
 class PoseEstimationError(RuntimeError):
@@ -32,6 +52,7 @@ class CameraPose:
     name: str
     center: tuple[float, float, float]
     rotation_world_to_camera: tuple[tuple[float, float, float], ...]
+    up_in_camera: tuple[float, float, float] = (0.0, -1.0, 0.0)
 
 
 @dataclass(frozen=True)
@@ -56,6 +77,32 @@ class AccuracyReport:
     position_median_m: float
     position_max_m: float
     facade_distance_m: float
+
+
+def up_in_camera(photo: Path) -> tuple[float, float, float]:
+    """Return which way is up in a photo's stored pixels, from its orientation tag.
+
+    COLMAP ignores orientation tags, so a phone held another way round stores its pixels
+    rotated, and only this tag says which way up they belong.
+    """
+    with Image.open(photo) as image:
+        orientation = image.getexif().get(_EXIF_ORIENTATION, 1)
+    return _UP_BY_ORIENTATION.get(orientation, (0.0, -1.0, 0.0))
+
+
+def focal_from_metadata(photo: Path) -> float:
+    """Return the focal length in pixels, from the 35 mm equivalent in its metadata."""
+    with Image.open(photo) as image:
+        width, height = image.size
+        exif = image.getexif().get_ifd(_EXIF_IFD)
+    equivalent_mm = exif.get(_EXIF_FOCAL_35MM)
+    if not equivalent_mm:
+        raise ValueError(
+            f"{photo.name} doesn't record its focal length, so please give --focal-px"
+        )
+    # A 35 mm equivalent is defined by the diagonal, whatever the sensor's shape.
+    diagonal_px = float(np.hypot(width, height))
+    return float(equivalent_mm) * diagonal_px / _FULL_FRAME_DIAGONAL_MM
 
 
 def list_photos(photo_dir: Path) -> list[Path]:
@@ -92,14 +139,24 @@ def estimate_poses(photo_dir: Path, work_dir: Path, focal_px: float) -> PoseEsti
     reader.camera_model = "PINHOLE"
     reader.camera_params = f"{focal_px},{focal_px},{width / 2},{height / 2}"
     database = work_dir / "database.db"
+    extraction = pycolmap.FeatureExtractionOptions()
+    extraction.max_image_size = _MAX_IMAGE_SIZE_PX
+    extraction.sift.max_num_features = _MAX_FEATURES
+    extraction.sift.first_octave = 0
     pycolmap.extract_features(
         database,
         photo_dir,
         camera_mode=pycolmap.CameraMode.SINGLE,
         reader_options=reader,
+        extraction_options=extraction,
         device=pycolmap.Device.cpu,
     )
-    pycolmap.match_sequential(database, device=pycolmap.Device.cpu)
+    pairing = pycolmap.SequentialPairingOptions()
+    pairing.overlap = _NEIGHBOUR_PHOTOS
+    pairing.quadratic_overlap = False
+    pycolmap.match_sequential(
+        database, pairing_options=pairing, device=pycolmap.Device.cpu
+    )
 
     options = pycolmap.IncrementalPipelineOptions()
     options.ba_refine_focal_length = False
@@ -123,6 +180,7 @@ def estimate_poses(photo_dir: Path, work_dir: Path, focal_px: float) -> PoseEsti
                     name=image.name,
                     center=_vector(image.projection_center()),
                     rotation_world_to_camera=tuple(_vector(row) for row in rotation),
+                    up_in_camera=up_in_camera(photo_dir / image.name),
                 )
             )
     poses.sort(key=lambda pose: pose.name)
@@ -184,8 +242,12 @@ def compare_with_truth(
 
 def write_estimate(estimate: PoseEstimate, path: Path) -> None:
     """Save camera poses as JSON."""
+    points = estimate.points
+    if len(points) > _MAX_POINTS_IN_FILE:
+        step = len(points) // _MAX_POINTS_IN_FILE + 1
+        points = points[::step]
     content = {
-        "format_version": 1,
+        "format_version": 2,
         "focal_px": estimate.focal_px,
         "missing": list(estimate.missing),
         "mean_reprojection_error_px": estimate.mean_reprojection_error_px,
@@ -194,9 +256,11 @@ def write_estimate(estimate: PoseEstimate, path: Path) -> None:
                 "name": pose.name,
                 "center": pose.center,
                 "rotation_world_to_camera": pose.rotation_world_to_camera,
+                "up_in_camera": pose.up_in_camera,
             }
             for pose in estimate.poses
         ],
+        "points": points.tolist(),
     }
     path.write_text(json.dumps(content, indent=2) + "\n", encoding="utf-8")
 

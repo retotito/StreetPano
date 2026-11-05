@@ -2,7 +2,9 @@
 
 #include <QAction>
 #include <QDir>
+#include <QFile>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QItemSelectionModel>
 #include <QKeySequence>
 #include <QMenuBar>
@@ -77,6 +79,15 @@ MainWindow::MainWindow(std::size_t previewBudgetBytes, QWidget* parent)
             [this](const QModelIndex& current) { showPhoto(current.row()); });
     connect(model_, &PhotoListModel::cacheChanged, this, &MainWindow::updateStatus);
 
+    auto* stitchMenu = menuBar()->addMenu(tr("&Stitch"));
+    QAction* stitchAction = stitchMenu->addAction(tr("&Quick Stitch…"));
+    stitchAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
+    connect(stitchAction, &QAction::triggered, this, &MainWindow::chooseStitch);
+    showPanoramaAction_ = stitchMenu->addAction(tr("Show &Panorama"));
+    showPanoramaAction_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_P));
+    showPanoramaAction_->setEnabled(false);
+    connect(showPanoramaAction_, &QAction::triggered, this, &MainWindow::showPanorama);
+
     auto* next = makeChild<QShortcut>(this, QKeySequence(Qt::Key_Right));
     connect(next, &QShortcut::activated, this, [this] { selectPhoto(currentRow_ + 1); });
     auto* previous = makeChild<QShortcut>(this, QKeySequence(Qt::Key_Left));
@@ -103,6 +114,13 @@ void MainWindow::chooseFolder() {
 }
 
 bool MainWindow::openFolder(const QString& folder) {
+    cancelStitch();
+    panorama_ = QImage{};
+    panoramaPath_.clear();
+    stitchMessage_.clear();
+    showPanoramaAction_->setEnabled(false);
+    currentFolder_ = folder;
+
     const core::PhotoListing listing =
         core::listPhotos(std::filesystem::path(folder.toStdU16String()));
 
@@ -132,6 +150,91 @@ bool MainWindow::openFolder(const QString& folder) {
     setWindowTitle(QStringLiteral("%1 - StreetPano").arg(QDir(folder).dirName()));
     selectPhoto(0);
     return true;
+}
+
+QString MainWindow::findPosesFile() const {
+    // The developer tools write poses.json in or next to the photo folder.
+    const QDir folder(currentFolder_);
+    const QStringList candidates = {
+        QDir::cleanPath(folder.absolutePath()) + QStringLiteral(".streetpano/poses.json"),
+        folder.filePath(QStringLiteral("poses.json")),
+        folder.filePath(QStringLiteral("../poses.json"))};
+    for (const QString& candidate : candidates) {
+        if (QFile::exists(candidate)) {
+            return QDir::cleanPath(candidate);
+        }
+    }
+    return {};
+}
+
+bool MainWindow::startStitchFromFolder() {
+    const QString posesPath = findPosesFile();
+    return !posesPath.isEmpty() && startStitch(posesPath);
+}
+
+void MainWindow::chooseStitch() {
+    QString posesPath = findPosesFile();
+    if (posesPath.isEmpty()) {
+        posesPath = QFileDialog::getOpenFileName(this, tr("Choose Camera Positions"),
+                                                 currentFolder_, tr("Camera positions (*.json)"));
+    }
+    if (!posesPath.isEmpty()) {
+        startStitch(posesPath);
+    }
+}
+
+bool MainWindow::startStitch(const QString& posesPath) {
+    if (stitchJob_ != nullptr || photoCount() == 0) {
+        return false;
+    }
+    const QString output =
+        QFileInfo(posesPath).absoluteDir().filePath(QStringLiteral("panorama.jpg"));
+    stitchJob_ = std::make_unique<StitchJob>(posesPath, QDir(currentFolder_), output);
+    connect(stitchJob_.get(), &StitchJob::progressChanged, this, &MainWindow::updateStatus);
+    connect(stitchJob_.get(), &StitchJob::finished, this, &MainWindow::onStitchFinished);
+    stitchMessage_ = tr("Stitching…");
+    stitchJob_->start();
+    updateStatus();
+    return true;
+}
+
+void MainWindow::cancelStitch() {
+    // Destroying the job stops and joins its worker, and drops its queued signals.
+    stitchJob_.reset();
+}
+
+void MainWindow::onStitchFinished() {
+    if (stitchJob_ == nullptr) {
+        return;
+    }
+    stitch::StitchResult result = stitchJob_->takeResult();
+    const QString output = stitchJob_->outputPath();
+    stitchJob_.reset();
+    if (result.panorama.isNull()) {
+        stitchMessage_ = tr("Stitching failed: %1").arg(result.error);
+        updateStatus();
+        return;
+    }
+    panorama_ = std::move(result.panorama);
+    panoramaPath_ = output;
+    showPanoramaAction_->setEnabled(true);
+    stitchMessage_ = tr("Panorama: %1 x %2 px, %3% detail")
+                         .arg(panorama_.width())
+                         .arg(panorama_.height())
+                         .arg(qRound(result.scale * 100.0));
+    if (!result.warnings.isEmpty()) {
+        stitchMessage_ +=
+            tr(", %n photo(s) with problems", nullptr, static_cast<int>(result.warnings.size()));
+    }
+    showPanorama();
+    updateStatus();
+}
+
+void MainWindow::showPanorama() {
+    if (!panorama_.isNull()) {
+        view_->fitToWindow();
+        view_->setImage(panorama_);
+    }
 }
 
 void MainWindow::selectPhoto(int row) {
@@ -190,11 +293,20 @@ void MainWindow::updateStatus() {
     } else {
         positionLabel_->setText(tr("No photos open"));
     }
-    const double used = static_cast<double>(previewCache_.usedBytes() + model_->cacheUsedBytes()) /
+    const double used = (static_cast<double>(previewCache_.usedBytes() + model_->cacheUsedBytes()) +
+                         static_cast<double>(panorama_.sizeInBytes())) /
                         kBytesPerMegabyte;
     const double budget =
         static_cast<double>(previewCache_.budgetBytes() + model_->cacheBudgetBytes()) /
         kBytesPerMegabyte;
+    if (stitchJob_ != nullptr && stitchJob_->total() > 0) {
+        stitchMessage_ =
+            tr("Stitching photo %1 of %2…").arg(stitchJob_->done()).arg(stitchJob_->total());
+    }
+    if (!stitchMessage_.isEmpty()) {
+        positionLabel_->setText(positionLabel_->text() + QStringLiteral("   |   ") +
+                                stitchMessage_);
+    }
     memoryLabel_->setText(
         tr("Image memory: %1 of %2 MB").arg(used, 0, 'f', 0).arg(budget, 0, 'f', 0));
 }

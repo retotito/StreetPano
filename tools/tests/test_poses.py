@@ -4,6 +4,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+from PIL import Image
 
 from streetpano.poses import (
     AccuracyReport,
@@ -12,7 +13,9 @@ from streetpano.poses import (
     PoseEstimationError,
     compare_with_truth,
     estimate_poses,
+    focal_from_metadata,
     list_photos,
+    up_in_camera,
     write_estimate,
 )
 from streetpano.synthetic import CameraSpec, default_scene, write_dataset
@@ -214,8 +217,6 @@ class TestInputChecks:
         photos = tmp_path / "photos"
         photos.mkdir()
         rng = np.random.default_rng(0)
-        from PIL import Image
-
         for index in range(3):
             noise = rng.integers(0, 255, (120, 160, 3), dtype=np.uint8)
             Image.fromarray(noise).save(photos / f"{index}.png")
@@ -229,6 +230,51 @@ def test_write_estimate(tmp_path: Path) -> None:
     path = tmp_path / "poses.json"
     write_estimate(estimate, path)
     content = json.loads(path.read_text())
-    assert content["format_version"] == 1
+    assert content["format_version"] == 2
+    assert content["points"] == []
     assert content["missing"] == ["b.png"]
     assert content["poses"][0]["center"] == [1.0, 2.0, 3.0]
+
+
+def test_written_points_are_limited(tmp_path: Path) -> None:
+    pose = CameraPose("a.png", (1.0, 2.0, 3.0), ((1.0, 0.0, 0.0),) * 3)
+    points = np.zeros((50000, 3))
+    path = tmp_path / "poses.json"
+    write_estimate(PoseEstimate((pose,), points, 800.0, (), 0.2), path)
+    assert 10000 < len(json.loads(path.read_text())["points"]) <= 20000
+
+
+def save_photo(path: Path, orientation: int = 1, focal_35mm: int | None = None) -> Path:
+    exif = Image.Exif()
+    exif[0x0112] = orientation
+    if focal_35mm is not None:
+        exif.get_ifd(0x8769)[0xA405] = focal_35mm
+    Image.new("RGB", (400, 300)).save(path, exif=exif)
+    return path
+
+
+@pytest.mark.parametrize(
+    ("orientation", "expected"),
+    [
+        (1, (0.0, -1.0, 0.0)),
+        (3, (0.0, 1.0, 0.0)),
+        (6, (-1.0, 0.0, 0.0)),
+        (8, (1.0, 0.0, 0.0)),
+        (2, (0.0, -1.0, 0.0)),
+    ],
+)
+def test_up_comes_from_the_orientation_tag(
+    tmp_path: Path, orientation: int, expected: tuple[float, float, float]
+) -> None:
+    assert up_in_camera(save_photo(tmp_path / "a.jpg", orientation)) == expected
+
+
+def test_focal_length_comes_from_metadata(tmp_path: Path) -> None:
+    photo = save_photo(tmp_path / "a.jpg", focal_35mm=26)
+    # The diagonal of 400 x 300 is 500 px.
+    assert focal_from_metadata(photo) == pytest.approx(26 * 500 / 43.27)
+
+
+def test_missing_focal_length_gives_a_clear_error(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="--focal-px"):
+        focal_from_metadata(save_photo(tmp_path / "a.jpg"))

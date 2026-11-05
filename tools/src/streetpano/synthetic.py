@@ -331,6 +331,41 @@ def write_dataset(scene: StreetScene, output_dir: Path) -> None:
     (output_dir / "scene.json").write_text(
         json.dumps(description, indent=2) + "\n", encoding="utf-8"
     )
+    (output_dir / "poses.json").write_text(
+        json.dumps(exact_poses(scene), indent=2) + "\n", encoding="utf-8"
+    )
+
+
+def exact_poses(scene: StreetScene) -> dict[str, Any]:
+    """Return the exact camera positions, in the same format as ``streetpano poses``.
+
+    This lets the stitcher be tested without any error from finding camera positions.
+    COLMAP's world is right-handed, so Z is mirrored. Its cameras have Y pointing down.
+    """
+    mirror = np.diag([1.0, 1.0, -1.0])
+    flip_y = np.diag([1.0, -1.0, 1.0])
+    rotation = flip_y @ _rotation(scene).T @ mirror
+    rng = np.random.default_rng([scene.seed, 3])
+    margin_m = scene.facade_distance_m
+    x_m = rng.uniform(-margin_m, scene.length_m + margin_m, 2000)
+    y_m = scene.slope * x_m + rng.uniform(0.5, 9.0, 2000)
+    points = np.stack([x_m, y_m, np.full(2000, -scene.facade_distance_m)], axis=1)
+    return {
+        "format_version": 2,
+        "focal_px": scene.camera.focal_px,
+        "missing": [],
+        "mean_reprojection_error_px": 0.0,
+        "poses": [
+            {
+                "name": f"{index:05d}.png",
+                "center": (mirror @ np.array(camera_position(scene, index))).tolist(),
+                "rotation_world_to_camera": rotation.tolist(),
+                "up_in_camera": [0.0, -1.0, 0.0],
+            }
+            for index in range(scene.photo_count)
+        ],
+        "points": points.tolist(),
+    }
 
 
 def _require_valid_index(scene: StreetScene, index: int) -> None:

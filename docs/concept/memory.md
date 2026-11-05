@@ -55,8 +55,15 @@ steps run through a job queue, which sets parallelism from the available budget.
 These are starting values to be measured and adjusted. AI models may not fit within
 this budget at useful quality, so the design allows them to run on a remote GPU.
 
-COLMAP needs watching. It peaked at 2.2 GB on 41 photos of only 1280 × 720 px, so
-real photos will need a limit on image size or sections processed separately.
+Measured so far on an 8 GB laptop, using 16 synthetic photos of 12 MP:
+
+| Step | Time | Peak memory |
+|---|---:|---:|
+| Finding camera positions with COLMAP | 8.4 s | 2.0 GB |
+| Stitching at full detail | 1.2 s | 155 MB |
+
+Stitching holds only the panorama and one photo in memory at a time. By default, it
+reduces the panorama to fit within 64 MP, which takes 256 MB.
 
 ## Size estimates
 

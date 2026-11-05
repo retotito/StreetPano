@@ -31,15 +31,18 @@ flowchart LR
 
 ## 2. Classic baseline, no AI
 
-- [ ] Load photos and correct lenses
+- [x] Load JPEG and PNG photos
+- [ ] Correct lens distortion, and load RAW
 - [x] Find camera positions with COLMAP, measured against synthetic streets, using a
   Python tool
 - [ ] Find camera positions from the app, in C++
-- [ ] Read focal length from photo metadata
+- [x] Read focal length from photo metadata
 - [ ] Test camera positions on real photos
-- [ ] Correct verticals automatically and build the facade surface
+- [x] Fit one facade plane, with verticals from the average camera direction
+- [ ] Follow curved streets and different building setbacks
 - [ ] Choose a [licence-compatible graph cut](concept/ai-models.md)
-- [ ] Choose seams, then blend
+- [x] First stitch with straight seams and a short blend, shown in the app
+- [ ] Graph-cut seams and pyramid blending
 
 **Done when:** 100 m of street produces a panorama with aligned facades.
 

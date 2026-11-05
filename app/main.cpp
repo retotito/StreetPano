@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QCommandLineOption>
 #include <QCommandLineParser>
 #include <QStringList>
 
@@ -16,13 +17,18 @@ int main(int argc, char* argv[]) {
     parser.addPositionalArgument(QStringLiteral("folder"),
                                  QStringLiteral("Folder of photos to open."),
                                  QStringLiteral("[folder]"));
+    const QCommandLineOption stitchOption(QStringLiteral("stitch"),
+                                          QStringLiteral("Stitch the folder after opening it."));
+    parser.addOption(stitchOption);
     parser.process(application);
 
     streetpano::ui::MainWindow window;
     window.show();
     const QStringList arguments = parser.positionalArguments();
     if (!arguments.isEmpty()) {
-        window.openFolder(arguments.first());
+        if (window.openFolder(arguments.first()) && parser.isSet(stitchOption)) {
+            window.startStitchFromFolder();
+        }
     }
     return QApplication::exec();
 }

@@ -15,6 +15,8 @@ from streetpano.poses import (
     PoseEstimationError,
     compare_with_truth,
     estimate_poses,
+    focal_from_metadata,
+    list_photos,
     write_estimate,
 )
 from streetpano.sizing import (
@@ -77,7 +79,7 @@ def build_parser() -> argparse.ArgumentParser:
     poses.add_argument("photos", type=Path, help="folder of photos")
     poses.add_argument("output", type=Path, help="new or empty folder")
     poses.add_argument(
-        "--focal-px", type=float, required=True, help="known focal length, px"
+        "--focal-px", type=float, help="focal length, px (default: from photo metadata)"
     )
     poses.add_argument(
         "--truth", type=Path, help="scene.json of a synthetic street, to measure error"
@@ -132,7 +134,11 @@ def run_synth(args: argparse.Namespace) -> None:
 
 def run_poses(args: argparse.Namespace) -> None:
     """Find camera positions, and measure them if the truth is known."""
-    estimate = estimate_poses(args.photos, args.output, args.focal_px)
+    focal_px = args.focal_px
+    if focal_px is None:
+        focal_px = focal_from_metadata(list_photos(args.photos)[0])
+        print(f"Focal length from photo metadata: {focal_px:.1f} px")
+    estimate = estimate_poses(args.photos, args.output, focal_px)
     write_estimate(estimate, args.output / "poses.json")
     print(f"Registered {len(estimate.poses)} photos")
     if estimate.missing:

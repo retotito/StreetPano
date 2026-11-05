@@ -6,8 +6,9 @@
 Open-source software for building very long street panoramas from photos taken
 while walking along a street.
 
-> **Status: early development.** The first window opens a folder and shows its photos,
-> and developer tools can find camera positions. The app can't stitch yet.
+> **Status: early development.** The app builds a first panorama, but with simple straight
+> seams, so foreground objects are cut and squeezed. It has only been tested on synthetic
+> streets so far.
 
 ![Seams chosen by graph cut keep a car whole, while straight seams break it](docs/assets/seams.svg)
 
@@ -68,6 +69,14 @@ This builds the app and opens a synthetic street. To open your own photos:
 
 Use the left and right arrow keys to move along the street, the scroll wheel to zoom,
 and double-click to fit the photo to the window.
+
+To stitch your own photos, which finds the camera positions and then opens the panorama:
+
+```sh
+./scripts/stitch.sh ~/Pictures/my-street
+```
+
+See the [capture guide](docs/concept/capture.md) for how to take the photos.
 
 ## Developer tools
 
