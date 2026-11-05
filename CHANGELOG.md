@@ -13,6 +13,9 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- First stitching: `scripts/stitch.sh` takes a folder of photos through to a panorama,
+  with straight seams, shown in the app
+- Focal length read from photo metadata, and support for phones held any way round
 - First window, which opens a folder of photos and shows a film strip and a zoomable
   photo view
 - Memory and thread checks in CI, on Linux, macOS and Windows builds

@@ -21,6 +21,7 @@ from streetpano.synthetic import (
     StreetScene,
     camera_position,
     default_scene,
+    exact_poses,
     iter_frames,
     project_point,
     render_frame,
@@ -350,3 +351,26 @@ class TestWriteDataset:
     def test_accepts_an_empty_folder(self, tmp_path: Path) -> None:
         write_dataset(default_scene(length_m=0, camera=SMALL), tmp_path)
         assert (tmp_path / "scene.json").exists()
+
+
+def test_exact_poses_project_the_same_way_as_the_scene() -> None:
+    scene = default_scene(length_m=4, camera=SMALL, pitch_deg=5.0, roll_deg=-2.0)
+    poses = exact_poses(scene)
+    pose = poses["poses"][2]
+    rotation = np.array(pose["rotation_world_to_camera"])
+    assert np.linalg.det(rotation) == pytest.approx(1.0)
+    world = np.array([3.0, 4.0, 15.0])
+    colmap_world = world * np.array([1.0, 1.0, -1.0])
+    x, y, z = rotation @ (colmap_world - np.array(pose["center"]))
+    focal = scene.camera.focal_px
+    expected_u, expected_v, _ = project_point(scene, 2, tuple(world))
+    assert focal * x / z + SMALL.width_px / 2 == pytest.approx(expected_u)
+    assert focal * y / z + SMALL.height_px / 2 == pytest.approx(expected_v)
+
+
+def test_dataset_includes_exact_poses(tmp_path: Path) -> None:
+    write_dataset(default_scene(length_m=0, camera=SMALL), tmp_path)
+    content = json.loads((tmp_path / "poses.json").read_text())
+    assert content["format_version"] == 2
+    assert len(content["poses"]) == 1
+    assert len(content["points"]) == 2000

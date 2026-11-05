@@ -75,6 +75,21 @@ If a lens can't fit a whole building in the frame, don't walk further from it,
 because the street width limits that. Shoot closer together, or walk the street
 twice with the camera tilted to a different height.
 
+## Stitching your photos
+
+Copy the photos into their own folder, and then run:
+
+```sh
+./scripts/stitch.sh ~/Pictures/my-street
+```
+
+This reads the focal length from the photos, finds the camera positions, and opens the
+app with the panorama. If the photos don't record a 35 mm equivalent focal length, add
+the focal length in pixels after the folder name.
+
+The results go in a `my-street.streetpano` folder next to your photos. Delete that
+folder to start again. Your original photos are never changed.
+
 ## Parked cars: use a higher camera
 
 A row of parked cars hides the lower facade from every position along the street,

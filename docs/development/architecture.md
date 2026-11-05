@@ -1,8 +1,8 @@
 # Architecture
 
 !!! note
-    Most of this is planned. Today, the app contains `core/lru_cache`,
-    `core/photo_listing` and a first Qt window. See the [roadmap](../roadmap.md).
+    Most of this is planned. Today, the app has a first window and a simple stitcher, and
+    camera positions still come from a Python tool. See the [roadmap](../roadmap.md).
 
 ## Components
 
@@ -55,11 +55,13 @@ See the [decision record](../adr/0010-cpp-and-qt.md).
 ```text
 app/                 Program entry point
 src/core/            Pipeline, with no Qt
+src/stitch/          Stitching with real files, using Qt only for images and JSON
 src/ui/              Qt screens
 tests/core/          Catch2 tests
 tests/ui/            Qt Test screen tests
 tests/sanitizers/    Rules for problems inside system libraries
 scripts/dev.sh       Builds and opens the app
+scripts/stitch.sh    Takes a folder of photos through to an open panorama
 tools/               Python developer tools
 docs/                This documentation
 ```
@@ -70,6 +72,8 @@ docs/                This documentation
 src/core/
 ├── lru_cache        Memory-budgeted cache (exists)
 ├── photo_listing    Finding photos in a folder (exists)
+├── street_frame     Fitting the facade plane (exists)
+├── stitch_plan      Panorama layout and drawing strips (exists)
 ├── project/         Project files, decisions and masks
 ├── ingest/          RAW and JPEG loading, lens correction
 ├── poses/           Camera positions through COLMAP

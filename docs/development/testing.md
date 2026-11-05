@@ -47,7 +47,8 @@ system libraries.
 | **Unit** | Individual calculations and classes | In use |
 | **Property** | Rules that must always hold, such as "closer objects shift more" | In use |
 | **Documented figures** | The numbers quoted in these docs match the code | In use |
-| **Damaged files** | Empty, truncated, random and oversized images fail safely | In use |
+| **Damaged files** | Empty, truncated, random and oversized images, and damaged camera position files, fail safely | In use |
+| **Stitching accuracy** | A panorama of a known facade is compared with its true colours | In use |
 | **Screen tests** | Real windows without a display, including checks of drawn pixels | In use |
 | **Synthetic street** | Checks against known geometry | Generator in use, end-to-end checks planned |
 | **Memory cap** | A long street stays within its memory budget | Planned |
