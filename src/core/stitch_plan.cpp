@@ -245,17 +245,18 @@ std::vector<int> findSeam(const CanvasView& canvas, const ImageView& region, int
             }
             cost += kOffCentreCost * static_cast<float>(std::abs(firstX + x - preferredX)) /
                     static_cast<float>(std::max(reach, 1));
-            float best = costs[static_cast<std::size_t>(x)];
+            const auto column = static_cast<std::size_t>(x);
+            float best = costs[column];
             std::int8_t step = 0;
-            if (x > 0 && costs[static_cast<std::size_t>(x - 1)] < best) {
-                best = costs[static_cast<std::size_t>(x - 1)];
+            if (column > 0 && costs[column - 1] < best) {
+                best = costs[column - 1];
                 step = -1;
             }
-            if (x + 1 < width && costs[static_cast<std::size_t>(x + 1)] < best) {
-                best = costs[static_cast<std::size_t>(x + 1)];
+            if (column + 1 < columns && costs[column + 1] < best) {
+                best = costs[column + 1];
                 step = 1;
             }
-            nextCosts[static_cast<std::size_t>(x)] = best + cost;
+            nextCosts[column] = best + cost;
             rowSteps[x] = step;
         }
         std::swap(costs, nextCosts);
