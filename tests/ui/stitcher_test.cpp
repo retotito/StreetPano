@@ -8,6 +8,7 @@
 #include <QtTest>
 #include <atomic>
 #include <cmath>
+#include <vector>
 
 #include "core/stitch_plan.hpp"
 #include "stitch/pose_file.hpp"
@@ -30,6 +31,7 @@ class StitcherTest : public QObject {
   private slots:
     void matchesTheTrueFacade();
     void matchesTheTrueFacadeWhenReduced();
+    void alignsAWallThatStartsTooNear();
     void hidesExposureDifferencesAtSeams();
     void reportsProgress();
     void respectsTheMemoryBudget();
@@ -103,6 +105,24 @@ void StitcherTest::matchesTheTrueFacade() {
     QCOMPARE(result.scale, 1.0);
     const double error = meanError(result.panorama, street.poses(), {});
     QVERIFY2(error < 2.0, qPrintable(QStringLiteral("Mean error: %1").arg(error)));
+}
+
+void StitcherTest::alignsAWallThatStartsTooNear() {
+    const Street street;
+    auto poses = street.poses();
+    for (auto& point : poses.points) {
+        point.z = StreetFixture::kDepth * 0.9;
+    }
+    // This facade's pattern is coarse, so a wider spacing makes the wrong distance visible.
+    std::vector<streetpano::core::CameraPose> spaced;
+    for (std::size_t index = 0; index < poses.poses.size(); index += 4) {
+        spaced.push_back(poses.poses[index]);
+    }
+    poses.poses = spaced;
+    const auto result = stitchPanorama(poses, QDir(street.folder.path()));
+    QVERIFY(result.error.isEmpty());
+    QVERIFY(result.alignment.seams > 0);
+    QVERIFY(result.alignment.moved > 0);
 }
 
 void StitcherTest::matchesTheTrueFacadeWhenReduced() {

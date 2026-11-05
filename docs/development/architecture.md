@@ -73,6 +73,7 @@ src/core/
 ├── lru_cache        Memory-budgeted cache (exists)
 ├── photo_listing    Finding photos in a folder (exists)
 ├── facade_surface   The wall that follows the buildings (exists)
+├── seam_match       Adjusting the wall until photos agree (exists)
 ├── stitch_plan      Panorama layout and drawing strips (exists)
 ├── project/         Project files, decisions and masks
 ├── ingest/          RAW and JPEG loading, lens correction

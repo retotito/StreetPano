@@ -41,8 +41,9 @@ flowchart LR
   connect, with [checked paths and joined sections](adr/0011-check-and-join-camera-paths.md)
 - [x] [Follow curved streets and different building setbacks](adr/0012-facade-surface.md),
   with verticals from the average camera direction
-- [ ] Let users correct the wall where the automatic distance is wrong
-- [ ] Reduce the wave in rooflines near trees
+- [x] Straighten facades: fit lines, and adjust the wall until photos agree at seams
+- [ ] Let users correct the wall where the automatic distance is wrong, and level
+  rooflines by hand
 - [ ] Choose a [licence-compatible graph cut](concept/ai-models.md)
 - [x] First stitch with straight seams and a short blend, shown in the app
 - [ ] Graph-cut seams and pyramid blending

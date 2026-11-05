@@ -5,12 +5,78 @@
 #include <algorithm>
 #include <cmath>
 #include <unordered_set>
+#include <vector>
+
+#include "core/seam_match.hpp"
 
 namespace streetpano::stitch {
 namespace {
 
 [[nodiscard]] QString photoPath(const QDir& folder, const core::CameraPose& pose) {
     return folder.filePath(QString::fromStdString(pose.name));
+}
+
+constexpr int kMatchingPhotoWidth = 1200;  // Enough to judge alignment, and quick to decode.
+
+[[nodiscard]] QImage readForMatching(const QDir& folder, const core::CameraPose& pose, QSize size) {
+    QImageReader reader(photoPath(folder, pose));
+    reader.setAutoTransform(false);
+    reader.setScaledSize(size);
+    QImage photo = reader.read();
+    if (!photo.isNull()) {
+        photo.convertTo(QImage::Format_ARGB32);
+    }
+    return photo;
+}
+
+[[nodiscard]] core::ImageView viewOf(const QImage& image) {
+    return core::ImageView{reinterpret_cast<const std::uint32_t*>(image.constBits()), image.width(),
+                           image.height(), static_cast<std::size_t>(image.bytesPerLine())};
+}
+
+// Moves the wall so that neighbouring photos agree at each seam, holding two photos at a time.
+[[nodiscard]] core::FacadeSurface alignedSurface(const core::FacadeSurface& surface,
+                                                 const core::StitchPlan& plan,
+                                                 const std::vector<core::CameraPose>& poses,
+                                                 const QDir& folder, double focal, QSize photoSize,
+                                                 SeamAlignment& alignment,
+                                                 const std::atomic<bool>* cancel) {
+    const double shrink =
+        std::min(1.0, kMatchingPhotoWidth / static_cast<double>(photoSize.width()));
+    const QSize size(std::max(2, static_cast<int>(photoSize.width() * shrink)),
+                     std::max(2, static_cast<int>(photoSize.height() * shrink)));
+    const double matchingFocal = focal * size.width() / static_cast<double>(photoSize.width());
+
+    std::vector<core::SeamOffset> seams;
+    double scoreSum = 0.0;
+    QImage previous;
+    for (std::size_t index = 0; index < plan.strips.size(); ++index) {
+        if (cancel != nullptr && cancel->load()) {
+            return surface;
+        }
+        QImage current = readForMatching(folder, poses[plan.strips[index].camera], size);
+        if (index > 0 && !previous.isNull() && !current.isNull()) {
+            const double arc = plan.leftArc + plan.strips[index].xStart * plan.unitsPerPixel;
+            const core::SeamMatch match = core::matchAtSeam(
+                surface, arc, {&poses[plan.strips[index - 1].camera], viewOf(previous)},
+                {&poses[plan.strips[index].camera], viewOf(current)}, matchingFocal);
+            scoreSum += match.scoreAtWall;
+            ++alignment.seams;
+            if (match.offset.has_value()) {
+                seams.push_back({arc, *match.offset});
+                ++alignment.moved;
+            }
+        }
+        previous = std::move(current);
+    }
+    if (alignment.seams > 0) {
+        alignment.meanScoreBefore = scoreSum / alignment.seams;
+    }
+    if (seams.empty()) {
+        return surface;
+    }
+    const std::vector<double> offsets = core::sampleOffsets(surface, seams);
+    return core::withDepthOffsets(surface, offsets);
 }
 
 }  // namespace
@@ -52,9 +118,17 @@ StitchResult stitchPanorama(const PoseFile& poses, const QDir& photoFolder,
         result.error = QString::fromStdString(surfaceResult.error);
         return result;
     }
-    const core::FacadeSurface& surface = *surfaceResult.surface;
+    core::FacadeSurface surface = *surfaceResult.surface;
     core::PlanResult planResult = core::makeStitchPlan(
         surface, usable, poses.focalPixels, photoSize.width(), photoSize.height(), options);
+    if (!planResult.plan.has_value()) {
+        result.error = QString::fromStdString(planResult.error);
+        return result;
+    }
+    surface = alignedSurface(surface, *planResult.plan, usable, photoFolder, poses.focalPixels,
+                             photoSize, result.alignment, cancel);
+    planResult = core::makeStitchPlan(surface, usable, poses.focalPixels, photoSize.width(),
+                                      photoSize.height(), options);
     if (!planResult.plan.has_value()) {
         result.error = QString::fromStdString(planResult.error);
         return result;

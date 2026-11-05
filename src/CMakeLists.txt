@@ -2,6 +2,8 @@ add_library(streetpano_core STATIC
     core/lru_cache.hpp
     core/photo_listing.cpp
     core/photo_listing.hpp
+    core/seam_match.cpp
+    core/seam_match.hpp
     core/stitch_plan.cpp
     core/stitch_plan.hpp
     core/camera_pose.hpp
