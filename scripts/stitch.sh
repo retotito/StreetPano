@@ -17,8 +17,9 @@ cmake --preset release >/dev/null
 cmake --build --preset release --target streetpano_app
 
 if [ ! -f "$work/poses.json" ]; then
+    # Only COLMAP's own working files are replaced, never a panorama or saved edits.
+    rm -rf "$work/database.db" "$work/sparse"
     # Keep the Mac awake, because sleeping pauses this step.
-    rm -rf "$work"
     echo "Finding camera positions. This can take several minutes..."
     if [ $# -ge 2 ]; then
         caffeinate -i uv run --project tools streetpano poses "$photos" "$work" --focal-px "$2"

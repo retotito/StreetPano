@@ -42,9 +42,20 @@ void StitchJob::run() {
                 emit workerProgressed(QPrivateSignal{});
             },
             &cancel_);
-        if (!result.panorama.isNull() && !result.panorama.save(outputPath_, nullptr, 95)) {
-            result.warnings.append(
-                QStringLiteral("The panorama couldn't be saved to %1.").arg(outputPath_));
+        if (!result.panorama.isNull()) {
+            const stitch::DecisionsResult saved =
+                stitch::readDecisions(stitch::decisionsPathFor(posesPath_));
+            if (saved.decisions.has_value()) {
+                decisions_ = *saved.decisions;
+                result.panorama =
+                    stitch::withPatches(result, photoFolder_, decisions_.patches, result.warnings);
+            } else {
+                result.warnings.append(saved.error);
+            }
+            if (!stitch::savePanorama(result.panorama, outputPath_)) {
+                result.warnings.append(
+                    QStringLiteral("The panorama couldn't be saved to %1.").arg(outputPath_));
+            }
         }
     } else {
         result.error = poses.error;
@@ -54,6 +65,11 @@ void StitchJob::run() {
         result_ = std::move(result);
     }
     emit workerFinished(QPrivateSignal{});
+}
+
+stitch::Decisions StitchJob::takeDecisions() {
+    const std::scoped_lock lock(mutex_);
+    return std::exchange(decisions_, stitch::Decisions{});
 }
 
 stitch::StitchResult StitchJob::takeResult() {

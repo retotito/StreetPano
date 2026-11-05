@@ -2,12 +2,15 @@
 
 #include <QImage>
 #include <QPointF>
+#include <QPolygonF>
 #include <QString>
 #include <QWidget>
+#include <vector>
 
 namespace streetpano::ui {
 
-// Shows one image, with zoom around the cursor and drag to pan.
+// Shows one image, with zoom around the cursor and drag to pan. In lasso mode, dragging with the
+// left button draws an outline instead, and the right button still pans.
 class PhotoView : public QWidget {
     Q_OBJECT
 
@@ -21,11 +24,22 @@ class PhotoView : public QWidget {
     void fitToWindow();
     void zoomAround(QPointF widgetPoint, double factor);
 
+    void setLassoMode(bool enabled);
+    // Outlines to draw over the image, in image coordinates. selected is highlighted, or -1.
+    void setOutlines(std::vector<QPolygonF> outlines, int selected);
+
+    [[nodiscard]] bool isLassoMode() const { return lassoMode_; }
     [[nodiscard]] const QImage& image() const { return image_; }
     [[nodiscard]] const QString& message() const { return message_; }
     [[nodiscard]] double zoom() const { return zoom_; }
     [[nodiscard]] QPointF offset() const { return offset_; }
     [[nodiscard]] bool isFitted() const { return fitted_; }
+
+  signals:
+    // The finished outline, in image coordinates.
+    void lassoFinished(const QPolygonF& outline);
+    // A click that wasn't a drag, in image coordinates.
+    void imageClicked(QPointF point);
 
   protected:
     void paintEvent(QPaintEvent* event) override;
@@ -33,10 +47,12 @@ class PhotoView : public QWidget {
     void wheelEvent(QWheelEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
     void mouseDoubleClickEvent(QMouseEvent* event) override;
 
   private:
     [[nodiscard]] double fitZoom() const;
+    [[nodiscard]] QPointF toImage(QPointF widgetPoint) const;
 
     QImage image_;
     QString message_;
@@ -44,6 +60,12 @@ class PhotoView : public QWidget {
     QPointF offset_;
     QPointF lastDragPoint_;
     bool fitted_ = true;
+    bool lassoMode_ = false;
+    bool moved_ = false;
+    QPointF pressPoint_;
+    QPolygonF lasso_;
+    std::vector<QPolygonF> outlines_;
+    int selectedOutline_ = -1;
 };
 
 }  // namespace streetpano::ui

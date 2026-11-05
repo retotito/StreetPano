@@ -55,8 +55,9 @@ flowchart LR
 
 This tests the core idea, and the riskiest part of it, early.
 
-- [ ] Mark objects by hand in source photos
-- [ ] Implement "keep whole" and "remove"
+- [x] [Mark areas by hand](adr/0014-edits-as-saved-decisions.md) on the panorama, and choose
+  which photo fills them, with undo
+- [ ] Choose the best photo for "keep whole" and "remove" automatically
 - [ ] Add the parallax check and clean plate
 - [ ] Test SAM 2 tracking across photos
 

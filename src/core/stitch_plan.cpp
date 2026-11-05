@@ -48,38 +48,8 @@ struct Extent {
     return extent;
 }
 
-[[nodiscard]] std::uint32_t mixPixels(std::uint32_t from, std::uint32_t to, std::uint32_t weight) {
-    // Weight runs from 0 to 256. Masks keep each pair of channels from overflowing.
-    const std::uint32_t inverse = 256U - weight;
-    const std::uint32_t redBlue =
-        (((from & 0x00FF00FFU) * inverse + (to & 0x00FF00FFU) * weight) >> 8U) & 0x00FF00FFU;
-    const std::uint32_t green =
-        (((from & 0x0000FF00U) * inverse + (to & 0x0000FF00U) * weight) >> 8U) & 0x0000FF00U;
-    return 0xFF000000U | redBlue | green;
-}
-
-[[nodiscard]] const std::uint32_t* rowOf(const ImageView& image, int y) {
-    const auto* start = reinterpret_cast<const unsigned char*>(image.pixels);
-    return reinterpret_cast<const std::uint32_t*>(start +
-                                                  static_cast<std::size_t>(y) * image.bytesPerLine);
-}
-
-[[nodiscard]] std::uint32_t* rowOf(const CanvasView& canvas, int y) {
-    auto* start = reinterpret_cast<unsigned char*>(canvas.pixels);
-    return reinterpret_cast<std::uint32_t*>(start +
-                                            static_cast<std::size_t>(y) * canvas.bytesPerLine);
-}
-
 [[nodiscard]] std::size_t brightnessOf(std::uint32_t pixel) {
     return (((pixel >> 16U) & 0xFFU) + 2U * ((pixel >> 8U) & 0xFFU) + (pixel & 0xFFU)) / 4U;
-}
-
-[[nodiscard]] std::uint32_t withGain(std::uint32_t pixel, std::uint32_t gain256) {
-    const auto scaled = [gain256](std::uint32_t channel) {
-        return std::min<std::uint32_t>(255U, (channel * gain256 + 128U) >> 8U);
-    };
-    return 0xFF000000U | (scaled((pixel >> 16U) & 0xFFU) << 16U) |
-           (scaled((pixel >> 8U) & 0xFFU) << 8U) | scaled(pixel & 0xFFU);
 }
 
 [[nodiscard]] int channelDifference(std::uint32_t a, std::uint32_t b) {
@@ -183,13 +153,13 @@ PlanResult makeStitchPlan(const FacadeSurface& surface, std::span<const CameraPo
     return result;
 }
 
-double brightnessGain(const CanvasView& canvas, const ImageView& region, int firstX) {
+double brightnessGain(const CanvasView& canvas, const ImageView& region, int firstX, int firstY) {
     // Medians, because a car in only one of the photos mustn't change the whole photo.
     std::array<std::size_t, 256> existingCounts{};
     std::array<std::size_t, 256> incomingCounts{};
     std::size_t total = 0;
     for (int y = 0; y < region.height; ++y) {
-        const std::uint32_t* existing = rowOf(canvas, y) + firstX;
+        const std::uint32_t* existing = rowOf(canvas, firstY + y) + firstX;
         const std::uint32_t* incoming = rowOf(region, y);
         for (int x = 0; x < region.width; ++x) {
             if ((existing[x] >> 24U) != 0U && (incoming[x] >> 24U) != 0U) {
@@ -271,6 +241,49 @@ std::vector<int> findSeam(const CanvasView& canvas, const ImageView& region, int
     return seam;
 }
 
+std::vector<std::uint32_t> projectPhoto(const FacadeSurface& surface, const StitchPlan& plan,
+                                        const CameraPose& pose, double focalPixels,
+                                        const ImageView& photo, int firstX, int endX, int firstY,
+                                        int endY) {
+    const auto width = static_cast<std::size_t>(endX - firstX);
+    const auto height = static_cast<std::size_t>(endY - firstY);
+
+    // Each column is a straight vertical line on the wall, so camera coordinates change
+    // linearly down a column, which keeps the loop below cheap.
+    std::vector<Vec3> columns;
+    columns.reserve(width);
+    for (int x = firstX; x < endX; ++x) {
+        const double arc = plan.leftArc + (x + 0.5) * plan.unitsPerPixel;
+        columns.push_back(
+            multiply(pose.worldToCamera, surface.pointAt(arc, plan.topHeight) - pose.center));
+    }
+    const Vec3 stepY = multiply(pose.worldToCamera, surface.up * -plan.unitsPerPixel);
+    const double centerX = photo.width / 2.0;
+    const double centerY = photo.height / 2.0;
+    const double maxSampleX = photo.width - 1.0;
+    const double maxSampleY = photo.height - 1.0;
+
+    std::vector<std::uint32_t> pixels(width * height, 0U);
+    for (std::size_t row = 0; row < height; ++row) {
+        std::uint32_t* output = pixels.data() + row * width;
+        const Vec3 rowOffset =
+            stepY * (static_cast<double>(firstY) + static_cast<double>(row) + 0.5);
+        for (std::size_t column = 0; column < width; ++column) {
+            const Vec3 point = columns[column] + rowOffset;
+            if (point.z <= 0.0) {
+                continue;
+            }
+            // Pixel centres sit at half coordinates, in both the panorama and the photo.
+            const double sampleX = focalPixels * point.x / point.z + centerX - 0.5;
+            const double sampleY = focalPixels * point.y / point.z + centerY - 0.5;
+            if (sampleX >= 0.0 && sampleY >= 0.0 && sampleX < maxSampleX && sampleY < maxSampleY) {
+                output[column] = sampleBilinear(photo, sampleX, sampleY);
+            }
+        }
+    }
+    return pixels;
+}
+
 void drawStrip(const FacadeSurface& surface, const StitchPlan& plan, const Strip& strip,
                const CameraPose& pose, double focalPixels, const ImageView& photo,
                const CanvasView& canvas, int featherPixels) {
@@ -283,40 +296,9 @@ void drawStrip(const FacadeSurface& surface, const StitchPlan& plan, const Strip
         return;
     }
     const int regionWidth = endX - firstX;
-
-    // Each column is a straight vertical line on the wall, so camera coordinates change
-    // linearly down a column, which keeps the loop below cheap.
-    std::vector<Vec3> columns;
-    columns.reserve(static_cast<std::size_t>(regionWidth));
-    for (int x = firstX; x < endX; ++x) {
-        const double arc = plan.leftArc + (x + 0.5) * plan.unitsPerPixel;
-        columns.push_back(
-            multiply(pose.worldToCamera, surface.pointAt(arc, plan.topHeight) - pose.center));
-    }
-    const Vec3 stepY = multiply(pose.worldToCamera, surface.up * -plan.unitsPerPixel);
-    const double centerX = photo.width / 2.0;
-    const double centerY = photo.height / 2.0;
-    const double maxSampleX = photo.width - 1.0;
-    const double maxSampleY = photo.height - 1.0;
-
     const auto regionColumns = static_cast<std::size_t>(regionWidth);
-    std::vector<std::uint32_t> pixels(regionColumns * static_cast<std::size_t>(canvas.height), 0U);
-    for (int y = 0; y < canvas.height; ++y) {
-        std::uint32_t* output = pixels.data() + static_cast<std::size_t>(y) * regionColumns;
-        const Vec3 rowOffset = stepY * (y + 0.5);
-        for (int x = 0; x < regionWidth; ++x) {
-            const Vec3 point = columns[static_cast<std::size_t>(x)] + rowOffset;
-            if (point.z <= 0.0) {
-                continue;
-            }
-            // Pixel centres sit at half coordinates, in both the panorama and the photo.
-            const double sampleX = focalPixels * point.x / point.z + centerX - 0.5;
-            const double sampleY = focalPixels * point.y / point.z + centerY - 0.5;
-            if (sampleX >= 0.0 && sampleY >= 0.0 && sampleX < maxSampleX && sampleY < maxSampleY) {
-                output[x] = sampleBilinear(photo, sampleX, sampleY);
-            }
-        }
-    }
+    std::vector<std::uint32_t> pixels =
+        projectPhoto(surface, plan, pose, focalPixels, photo, firstX, endX, 0, canvas.height);
 
     const ImageView region{pixels.data(), regionWidth, canvas.height,
                            regionColumns * sizeof(std::uint32_t)};

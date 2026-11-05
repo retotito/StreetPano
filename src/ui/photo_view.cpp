@@ -2,10 +2,13 @@
 
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPen>
 #include <QRectF>
 #include <QWheelEvent>
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <utility>
 
 namespace streetpano::ui {
 
@@ -76,6 +79,28 @@ void PhotoView::paintEvent(QPaintEvent* /*event*/) {
     }
     painter.setRenderHint(QPainter::SmoothPixmapTransform, zoom_ < 2.0);
     painter.drawImage(QRectF(offset_, QSizeF(image_.size()) * zoom_), image_);
+
+    const auto drawOutline = [this, &painter](const QPolygonF& outline, const QColor& colour,
+                                              bool closed) {
+        QPolygonF inWidget;
+        inWidget.reserve(outline.size());
+        for (const QPointF& point : outline) {
+            inWidget.append(point * zoom_ + offset_);
+        }
+        painter.setPen(QPen(colour, 2.0));
+        painter.setBrush(Qt::NoBrush);
+        if (closed) {
+            painter.drawPolygon(inWidget);
+        } else {
+            painter.drawPolyline(inWidget);
+        }
+    };
+    painter.setRenderHint(QPainter::Antialiasing);
+    for (std::size_t index = 0; index < outlines_.size(); ++index) {
+        const bool selected = static_cast<int>(index) == selectedOutline_;
+        drawOutline(outlines_[index], selected ? QColor(255, 196, 0) : QColor(90, 200, 250), true);
+    }
+    drawOutline(lasso_, QColor(255, 196, 0), false);
 }
 
 void PhotoView::resizeEvent(QResizeEvent* /*event*/) {
@@ -91,14 +116,67 @@ void PhotoView::wheelEvent(QWheelEvent* event) {
     event->accept();
 }
 
-void PhotoView::mousePressEvent(QMouseEvent* event) { lastDragPoint_ = event->position(); }
+QPointF PhotoView::toImage(QPointF widgetPoint) const { return (widgetPoint - offset_) / zoom_; }
+
+void PhotoView::setLassoMode(bool enabled) {
+    lassoMode_ = enabled;
+    lasso_.clear();
+    setCursor(enabled ? Qt::CrossCursor : Qt::ArrowCursor);
+    update();
+}
+
+void PhotoView::setOutlines(std::vector<QPolygonF> outlines, int selected) {
+    outlines_ = std::move(outlines);
+    selectedOutline_ = selected;
+    update();
+}
+
+void PhotoView::mousePressEvent(QMouseEvent* event) {
+    lastDragPoint_ = event->position();
+    pressPoint_ = event->position();
+    moved_ = false;
+    if (lassoMode_ && event->button() == Qt::LeftButton && !image_.isNull()) {
+        lasso_ = QPolygonF{toImage(event->position())};
+        update();
+    }
+}
 
 void PhotoView::mouseMoveEvent(QMouseEvent* event) {
-    if ((event->buttons() & Qt::LeftButton) != 0U) {
+    constexpr double kClickSlopPixels = 4.0;
+    if ((event->position() - pressPoint_).manhattanLength() > kClickSlopPixels) {
+        moved_ = true;
+    }
+    if (lassoMode_ && (event->buttons() & Qt::LeftButton) != 0U) {
+        if (!lasso_.isEmpty()) {
+            lasso_.append(toImage(event->position()));
+            update();
+        }
+        return;
+    }
+    if ((event->buttons() & (Qt::LeftButton | Qt::RightButton)) != 0U) {
         offset_ += event->position() - lastDragPoint_;
         lastDragPoint_ = event->position();
         fitted_ = false;
         update();
+    }
+}
+
+void PhotoView::mouseReleaseEvent(QMouseEvent* event) {
+    constexpr qsizetype kMinLassoPoints = 3;
+    if (event->button() != Qt::LeftButton) {
+        return;
+    }
+    if (lassoMode_ && !lasso_.isEmpty()) {
+        const QPolygonF finished = lasso_;
+        lasso_.clear();
+        update();
+        if (finished.size() >= kMinLassoPoints) {
+            emit lassoFinished(finished);
+        }
+        return;
+    }
+    if (!moved_ && !image_.isNull()) {
+        emit imageClicked(toImage(event->position()));
     }
 }
 

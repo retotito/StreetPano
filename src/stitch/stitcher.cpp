@@ -18,7 +18,7 @@ namespace {
 
 constexpr int kMatchingPhotoWidth = 1200;  // Enough to judge alignment, and quick to decode.
 
-[[nodiscard]] QImage readForMatching(const QDir& folder, const core::CameraPose& pose, QSize size) {
+[[nodiscard]] QImage readAtSize(const QDir& folder, const core::CameraPose& pose, QSize size) {
     QImageReader reader(photoPath(folder, pose));
     reader.setAutoTransform(false);
     reader.setScaledSize(size);
@@ -54,7 +54,7 @@ constexpr int kMatchingPhotoWidth = 1200;  // Enough to judge alignment, and qui
         if (cancel != nullptr && cancel->load()) {
             return surface;
         }
-        QImage current = readForMatching(folder, poses[plan.strips[index].camera], size);
+        QImage current = readAtSize(folder, poses[plan.strips[index].camera], size);
         if (index > 0 && !previous.isNull() && !current.isNull()) {
             const double arc = plan.leftArc + plan.strips[index].xStart * plan.unitsPerPixel;
             const core::SeamMatch match = core::matchAtSeam(
@@ -189,9 +189,49 @@ StitchResult stitchPanorama(const PoseFile& poses, const QDir& photoFolder,
             progress(done, total);
         }
     }
-    canvas.convertTo(QImage::Format_RGB32);
-    result.panorama = std::move(canvas);
+    // Keeps its alpha, because brightness matching and patches need to know what's empty.
+    result.base = std::move(canvas);
+    result.panorama = result.base;
+    result.surface = surface;
+    result.plan = plan;
+    result.poses = std::move(usable);
+    result.focalPixels = poses.focalPixels;
+    result.photoSize = photoSize;
     return result;
+}
+
+QImage withPatches(const StitchResult& stitched, const QDir& photoFolder,
+                   std::span<const core::Patch> patches, QStringList& warnings, int featherPixels) {
+    if (patches.empty()) {
+        return stitched.base;
+    }
+    QImage canvas = stitched.base.copy();
+    const core::CanvasView view{reinterpret_cast<std::uint32_t*>(canvas.bits()), canvas.width(),
+                                canvas.height(), static_cast<std::size_t>(canvas.bytesPerLine())};
+    const QSize size(
+        std::max(2, static_cast<int>(std::ceil(stitched.photoSize.width() * stitched.scale))),
+        std::max(2, static_cast<int>(std::ceil(stitched.photoSize.height() * stitched.scale))));
+    for (const core::Patch& patch : patches) {
+        const auto pose = std::find_if(
+            stitched.poses.begin(), stitched.poses.end(),
+            [&patch](const core::CameraPose& item) { return item.name == patch.photo; });
+        if (pose == stitched.poses.end()) {
+            warnings.append(QStringLiteral("Skipped an area: %1 isn't part of this panorama.")
+                                .arg(QString::fromStdString(patch.photo)));
+            continue;
+        }
+        QImage photo = readAtSize(photoFolder, *pose, size);
+        if (photo.isNull()) {
+            warnings.append(QStringLiteral("Skipped an area: can't read %1.")
+                                .arg(QString::fromStdString(patch.photo)));
+            continue;
+        }
+        const double focal =
+            stitched.focalPixels * size.width() / static_cast<double>(stitched.photoSize.width());
+        core::drawPatch(stitched.surface, stitched.plan, patch.outline, *pose, focal, viewOf(photo),
+                        view, featherPixels);
+    }
+    return canvas;
 }
 
 }  // namespace streetpano::stitch

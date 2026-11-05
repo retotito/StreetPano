@@ -19,3 +19,4 @@ new record that replaces it.
 | [0011](0011-check-and-join-camera-paths.md) | Check camera paths and join sections | Accepted |
 | [0012](0012-facade-surface.md) | A facade surface instead of one plane | Accepted |
 | [0013](0013-cheapest-path-seams.md) | Cheapest-path seams instead of a graph cut | Accepted |
+| [0014](0014-edits-as-saved-decisions.md) | Edits are saved decisions | Accepted |

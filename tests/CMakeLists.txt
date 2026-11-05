@@ -8,6 +8,7 @@ FetchContent_MakeAvailable(Catch2)
 add_executable(core_tests
     core/lru_cache_test.cpp
     core/photo_listing_test.cpp
+    core/patch_test.cpp
     core/seam_match_test.cpp
     core/stitch_plan_test.cpp
     core/facade_surface_test.cpp)
@@ -27,6 +28,7 @@ endfunction()
 add_ui_test(image_loader_test)
 add_ui_test(photo_view_test)
 add_ui_test(main_window_test)
+add_ui_test(decisions_test)
 add_ui_test(pose_file_test)
 add_ui_test(stitcher_test)
 

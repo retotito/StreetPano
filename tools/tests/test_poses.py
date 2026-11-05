@@ -215,10 +215,19 @@ class TestInputChecks:
             estimate_poses(tmp_path, tmp_path / "work", 0)
 
     def test_used_work_folder_is_rejected(self, street: Path, tmp_path: Path) -> None:
-        (tmp_path / "existing.txt").write_text("keep me")
-        with pytest.raises(FileExistsError, match="not empty"):
+        (tmp_path / "database.db").write_text("keep me")
+        with pytest.raises(FileExistsError, match="already has COLMAP files"):
             estimate_poses(street / "photos", tmp_path, 800)
-        assert (tmp_path / "existing.txt").read_text() == "keep me"
+        assert (tmp_path / "database.db").read_text() == "keep me"
+
+    def test_saved_edits_and_panorama_survive(
+        self, street: Path, tmp_path: Path
+    ) -> None:
+        (tmp_path / "decisions.json").write_text("keep me")
+        (tmp_path / "panorama.jpg").write_text("keep me too")
+        estimate_poses(street / "photos", tmp_path, CAMERA.focal_px)
+        assert (tmp_path / "decisions.json").read_text() == "keep me"
+        assert (tmp_path / "panorama.jpg").read_text() == "keep me too"
 
     def test_unrelated_photos_raise_a_clear_error(self, tmp_path: Path) -> None:
         photos = tmp_path / "photos"
