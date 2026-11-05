@@ -20,6 +20,7 @@ class DecisionsTest : public QObject {
     void keepsDecisionsBesideTheCameraPositions();
     void aMissingFileMeansNoEditsYet();
     void writtenDecisionsReadBackTheSame();
+    void anAreaCanHoldJustADescription();
     void rejectsADamagedFile();
     void rejectsADifferentVersion();
     void rejectsBadEdits_data();
@@ -42,7 +43,8 @@ QString write(const QTemporaryDir& folder, const QByteArray& content) {
 
 Decisions onePatch() {
     Decisions decisions;
-    decisions.patches.push_back(Patch{{{1.5, 2.5}, {3.5, 2.5}, {3.5, -1.0}}, "photo 1.jpg"});
+    decisions.patches.push_back(
+        Patch{{{1.5, 2.5}, {3.5, 2.5}, {3.5, -1.0}}, "photo 1.jpg", "fix the sign"});
     return decisions;
 }
 
@@ -73,6 +75,17 @@ void DecisionsTest::writtenDecisionsReadBackTheSame() {
     QCOMPARE(patch.outline.size(), std::size_t{3});
     QCOMPARE(patch.outline[2].arc, 3.5);
     QCOMPARE(patch.outline[2].height, -1.0);
+    QCOMPARE(patch.note, std::string("fix the sign"));
+}
+
+void DecisionsTest::anAreaCanHoldJustADescription() {
+    const QTemporaryDir folder;
+    const auto result = readDecisions(write(
+        folder,
+        R"({"format_version": 1, "patches": [{"note": "remove the van", "outline": [[0, 0], [1, 0], [1, 1]]}]})"));
+    QVERIFY(result.decisions.has_value());
+    QVERIFY(result.decisions->patches[0].photo.empty());
+    QCOMPARE(result.decisions->patches[0].note, std::string("remove the van"));
 }
 
 void DecisionsTest::rejectsADamagedFile() {

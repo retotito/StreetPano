@@ -19,14 +19,16 @@ constexpr qsizetype kMinOutlinePoints = 3;
 
 [[nodiscard]] std::optional<core::Patch> readPatch(const QJsonObject& object) {
     const QString photo = object.value(QStringLiteral("photo")).toString();
+    const QString note = object.value(QStringLiteral("note")).toString();
     const QJsonArray outline = object.value(QStringLiteral("outline")).toArray();
     // Only a file name is accepted, so that a damaged file can't point outside the folder.
-    if (photo.isEmpty() || photo.contains(u'/') || photo.contains(u'\\') ||
+    if ((photo.isEmpty() && note.isEmpty()) || photo.contains(u'/') || photo.contains(u'\\') ||
         outline.size() < kMinOutlinePoints) {
         return std::nullopt;
     }
     core::Patch patch;
     patch.photo = photo.toStdString();
+    patch.note = note.toStdString();
     patch.outline.reserve(static_cast<std::size_t>(outline.size()));
     for (qsizetype index = 0; index < outline.size(); ++index) {
         const QJsonArray point = outline.at(index).toArray();
@@ -97,8 +99,12 @@ bool writeDecisions(const Decisions& decisions, const QString& path) {
         for (const core::WallPoint& point : patch.outline) {
             outline.append(QJsonArray{point.arc, point.height});
         }
-        patches.append(QJsonObject{{QStringLiteral("photo"), QString::fromStdString(patch.photo)},
-                                   {QStringLiteral("outline"), outline}});
+        QJsonObject object{{QStringLiteral("photo"), QString::fromStdString(patch.photo)},
+                           {QStringLiteral("outline"), outline}};
+        if (!patch.note.empty()) {
+            object.insert(QStringLiteral("note"), QString::fromStdString(patch.note));
+        }
+        patches.append(object);
     }
     const QJsonObject root{{QStringLiteral("format_version"), kFormatVersion},
                            {QStringLiteral("patches"), patches}};

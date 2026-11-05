@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -22,7 +23,8 @@ struct WallPoint {
 // rather than in panorama pixels, so a decision survives a change of panorama size.
 struct Patch {
     std::vector<WallPoint> outline;
-    std::string photo;
+    std::string photo;  // Empty means this area doesn't change the panorama.
+    std::string note;   // What the user wants done here, in their own words.
 };
 
 // Returns the photos that can supply an area, best first: those that see all of it, then the
@@ -32,6 +34,12 @@ struct Patch {
                                                     std::span<const WallPoint> outline,
                                                     double focalPixels, int photoWidth,
                                                     int photoHeight);
+
+// Given the same area as seen by several photos, returns the one closest to their median. Something
+// that's only in some of the photos, such as a passing car, is far from the median, so this finds
+// the cleanest view. Regions need the same size, with zero alpha where a photo has no pixels.
+// Returns nothing if fewer than 3 photos see enough of the area.
+[[nodiscard]] std::optional<std::size_t> cleanestRegion(std::span<const ImageView> regions);
 
 // Draws an area of a photo onto the panorama, with a soft edge, matching the brightness of the
 // ring around the area. Pixels the

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QImage>
+#include <QPoint>
 #include <QPointF>
 #include <QPolygonF>
 #include <QString>
@@ -40,6 +41,8 @@ class PhotoView : public QWidget {
     void lassoFinished(const QPolygonF& outline);
     // A click that wasn't a drag, in image coordinates.
     void imageClicked(QPointF point);
+    // A right-click that wasn't a drag, in image coordinates, and on the screen.
+    void imageRightClicked(QPointF point, QPoint screenPoint);
 
   protected:
     void paintEvent(QPaintEvent* event) override;

@@ -1,19 +1,24 @@
 #include "ui/main_window.hpp"
 
 #include <QAction>
+#include <QCursor>
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QInputDialog>
 #include <QItemSelectionModel>
 #include <QKeySequence>
 #include <QMenuBar>
 #include <QShortcut>
 #include <QSplitter>
 #include <QStatusBar>
+#include <QToolBar>
 #include <algorithm>
 #include <cstddef>
 #include <filesystem>
+#include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -100,21 +105,60 @@ MainWindow::MainWindow(std::size_t previewBudgetBytes, QWidget* parent)
     redoAction_->setShortcut(QKeySequence::Redo);
     connect(redoAction_, &QAction::triggered, this, [this] { redo(); });
     editMenu->addSeparator();
-    markAreaAction_ = editMenu->addAction(tr("&Mark Area"));
+    markAreaAction_ = editMenu->addAction(tr("&Mark an Area"));
     markAreaAction_->setCheckable(true);
     markAreaAction_->setShortcut(QKeySequence(Qt::Key_L));
+    markAreaAction_->setToolTip(tr("Drag an outline around an object on the panorama"));
     connect(markAreaAction_, &QAction::toggled, view_, &PhotoView::setLassoMode);
-    nextAreaPhotoAction_ = editMenu->addAction(tr("&Next Photo for Area"));
-    nextAreaPhotoAction_->setShortcut(QKeySequence(Qt::Key_BracketRight));
+    removeObjectAction_ = editMenu->addAction(tr("&Remove This Object"));
+    removeObjectAction_->setToolTip(tr("Fill the area from the photo that shows it cleanest"));
+    connect(removeObjectAction_, &QAction::triggered, this, [this] { removeObject(); });
+    keepObjectAction_ = editMenu->addAction(tr("&Keep This Object Whole"));
+    keepObjectAction_->setToolTip(tr("Take all of the area from one photo"));
+    connect(keepObjectAction_, &QAction::triggered, this, [this] { keepObject(); });
+    nextAreaPhotoAction_ = editMenu->addAction(tr("Try a &Different Photo"));
+    nextAreaPhotoAction_->setShortcut(QKeySequence(Qt::Key_N));
+    nextAreaPhotoAction_->setToolTip(tr("Not right? Fill the area from another photo"));
     connect(nextAreaPhotoAction_, &QAction::triggered, this, [this] { changeAreaPhoto(1); });
-    previousAreaPhotoAction_ = editMenu->addAction(tr("&Previous Photo for Area"));
-    previousAreaPhotoAction_->setShortcut(QKeySequence(Qt::Key_BracketLeft));
+    previousAreaPhotoAction_ = editMenu->addAction(tr("Go Back to the &Previous Photo"));
+    previousAreaPhotoAction_->setShortcut(QKeySequence(Qt::Key_P));
     connect(previousAreaPhotoAction_, &QAction::triggered, this, [this] { changeAreaPhoto(-1); });
-    deleteAreaAction_ = editMenu->addAction(tr("&Delete Area"));
+    describeFixAction_ = editMenu->addAction(tr("Describe a Fix for the AI (AI Not Built Yet)…"));
+    describeFixAction_->setToolTip(
+        tr("Saves your description with this area. No AI acts on it yet"));
+    connect(describeFixAction_, &QAction::triggered, this, &MainWindow::askForFixDescription);
+    deleteAreaAction_ = editMenu->addAction(tr("&Cancel or Delete This Area"));
     deleteAreaAction_->setShortcut(QKeySequence(Qt::Key_Backspace));
-    connect(deleteAreaAction_, &QAction::triggered, this, [this] { deleteSelectedArea(); });
-    connect(view_, &PhotoView::lassoFinished, this, &MainWindow::markArea);
+    connect(deleteAreaAction_, &QAction::triggered, this, [this] { cancelOrDeleteArea(); });
+    connect(view_, &PhotoView::lassoFinished, this, [this](const QPolygonF& outline) {
+        beginArea(outline);
+        showAreaMenu(QCursor::pos());
+    });
     connect(view_, &PhotoView::imageClicked, this, &MainWindow::selectAreaAt);
+    connect(view_, &PhotoView::imageRightClicked, this, &MainWindow::onAreaRightClicked);
+
+    areaMenu_ = makeChild<QMenu>(this);
+    areaMenu_->addAction(removeObjectAction_);
+    areaMenu_->addAction(keepObjectAction_);
+    areaMenu_->addSeparator();
+    areaMenu_->addAction(nextAreaPhotoAction_);
+    areaMenu_->addAction(previousAreaPhotoAction_);
+    areaMenu_->addSeparator();
+    areaMenu_->addAction(describeFixAction_);
+    areaMenu_->addSeparator();
+    areaMenu_->addAction(deleteAreaAction_);
+
+    QToolBar* tools = addToolBar(tr("Edit"));
+    tools->setMovable(false);
+    tools->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    tools->addAction(markAreaAction_);
+    tools->addSeparator();
+    tools->addAction(removeObjectAction_);
+    tools->addAction(keepObjectAction_);
+    tools->addAction(nextAreaPhotoAction_);
+    tools->addSeparator();
+    tools->addAction(undoAction_);
+    tools->addAction(redoAction_);
 
     savePanoramaAction_ = fileMenu->addAction(tr("&Save Panorama"));
     savePanoramaAction_->setShortcut(QKeySequence::Save);
@@ -257,6 +301,7 @@ void MainWindow::onStitchFinished() {
     undoStack_.clear();
     redoStack_.clear();
     selectedArea_ = -1;
+    pendingArea_.clear();
     editMessage_.clear();
     showPanoramaAction_->setEnabled(true);
     stitchMessage_ = tr("Panorama: %1 x %2 px, %3% detail")
@@ -321,7 +366,12 @@ void MainWindow::redrawPanorama() {
     for (const core::Patch& patch : decisions_.patches) {
         outlines.push_back(toPanorama(patch.outline, stitched_.plan));
     }
-    view_->setOutlines(std::move(outlines), selectedArea_);
+    int highlighted = selectedArea_;
+    if (!pendingArea_.isEmpty()) {
+        outlines.push_back(pendingArea_);
+        highlighted = static_cast<int>(outlines.size()) - 1;
+    }
+    view_->setOutlines(std::move(outlines), highlighted);
 }
 
 void MainWindow::applyDecisions(stitch::Decisions decisions, int selected) {
@@ -342,6 +392,152 @@ void MainWindow::applyDecisions(stitch::Decisions decisions, int selected) {
     redrawPanorama();
     updateEditActions();
     updateStatus();
+}
+
+void MainWindow::beginArea(const QPolygonF& outline) {
+    if (!showingPanorama_ || panorama_.isNull() || outline.size() < 3) {
+        return;
+    }
+    pendingArea_ = outline;
+    selectedArea_ = -1;
+    markAreaAction_->setChecked(false);
+    editMessage_ = tr("Choose what to do with this area.");
+    redrawPanorama();
+    updateEditActions();
+    updateStatus();
+}
+
+std::vector<core::WallPoint> MainWindow::targetOutline() const {
+    if (!pendingArea_.isEmpty()) {
+        return toWall(pendingArea_, stitched_.plan);
+    }
+    if (selectedArea_ >= 0) {
+        return decisions_.patches[static_cast<std::size_t>(selectedArea_)].outline;
+    }
+    return {};
+}
+
+bool MainWindow::commitArea(std::string photo, const QString& message) {
+    const std::vector<core::WallPoint> outline = targetOutline();
+    undoStack_.push_back(decisions_);
+    redoStack_.clear();
+    stitch::Decisions changed = decisions_;
+    int selected = selectedArea_;
+    if (!pendingArea_.isEmpty()) {
+        changed.patches.push_back(core::Patch{outline, std::move(photo), {}});
+        selected = static_cast<int>(changed.patches.size()) - 1;
+        pendingArea_.clear();
+    } else {
+        changed.patches[static_cast<std::size_t>(selected)].photo = std::move(photo);
+    }
+    applyDecisions(std::move(changed), selected);
+    if (editMessage_.isEmpty()) {
+        editMessage_ = message;
+    }
+    updateStatus();
+    return true;
+}
+
+bool MainWindow::removeObject() {
+    const std::vector<core::WallPoint> outline = targetOutline();
+    if (outline.empty()) {
+        return false;
+    }
+    std::optional<std::string> photo =
+        stitch::cleanestPhoto(stitched_, QDir(currentFolder_), outline);
+    if (!photo.has_value()) {
+        editMessage_ = tr("Too few photos see this area to remove what's in it.");
+        updateStatus();
+        return false;
+    }
+    return commitArea(std::move(*photo),
+                      tr("Removed using the cleanest photo. Not right? Try a different photo."));
+}
+
+bool MainWindow::keepObject() {
+    const std::vector<core::WallPoint> outline = targetOutline();
+    if (outline.empty()) {
+        return false;
+    }
+    core::Patch patch;
+    patch.outline = outline;
+    const std::vector<std::size_t> choices = photoChoices(patch);
+    if (choices.empty()) {
+        editMessage_ = tr("No photo can see that area.");
+        updateStatus();
+        return false;
+    }
+    return commitArea(stitched_.poses[choices.front()].name,
+                      tr("Kept whole from one photo. Not right? Try a different photo."));
+}
+
+bool MainWindow::describeFix(const QString& description) {
+    const std::vector<core::WallPoint> outline = targetOutline();
+    if (outline.empty() || description.trimmed().isEmpty()) {
+        return false;
+    }
+    undoStack_.push_back(decisions_);
+    redoStack_.clear();
+    stitch::Decisions changed = decisions_;
+    int selected = selectedArea_;
+    if (!pendingArea_.isEmpty()) {
+        changed.patches.push_back(core::Patch{outline, {}, description.trimmed().toStdString()});
+        selected = static_cast<int>(changed.patches.size()) - 1;
+        pendingArea_.clear();
+    } else {
+        changed.patches[static_cast<std::size_t>(selected)].note =
+            description.trimmed().toStdString();
+    }
+    applyDecisions(std::move(changed), selected);
+    editMessage_ = tr("Your description is saved. No AI acts on it yet.");
+    updateStatus();
+    return true;
+}
+
+void MainWindow::askForFixDescription() {
+    bool accepted = false;
+    const QString description = QInputDialog::getMultiLineText(
+        this, tr("Describe a Fix for the AI"),
+        tr("What should happen here? For example: \"remove the white van\".\n"
+           "This is saved with the area. The AI isn't built yet, so nothing changes for now."),
+        selectedAreaNote(), &accepted);
+    if (accepted) {
+        describeFix(description);
+    }
+}
+
+bool MainWindow::cancelOrDeleteArea() {
+    if (!pendingArea_.isEmpty()) {
+        pendingArea_.clear();
+        editMessage_.clear();
+        redrawPanorama();
+        updateEditActions();
+        updateStatus();
+        return true;
+    }
+    return deleteSelectedArea();
+}
+
+void MainWindow::showAreaMenu(QPoint screenPoint) {
+    if (hasPendingArea() || selectedArea_ >= 0) {
+        areaMenu_->popup(screenPoint);
+    }
+}
+
+void MainWindow::onAreaRightClicked(QPointF point, QPoint screenPoint) {
+    if (!showingPanorama_) {
+        return;
+    }
+    if (pendingArea_.isEmpty() || !pendingArea_.containsPoint(point, Qt::OddEvenFill)) {
+        pendingArea_.clear();
+        selectAreaAt(point);
+    }
+    if (hasPendingArea() || selectedArea_ >= 0) {
+        showAreaMenu(screenPoint);
+    } else {
+        editMessage_ = tr("Choose Mark an Area, then drag an outline around an object.");
+        updateStatus();
+    }
 }
 
 bool MainWindow::markArea(const QPolygonF& outline) {
@@ -439,6 +635,7 @@ void MainWindow::selectAreaAt(QPointF point) {
         }
     }
     selectedArea_ = found;
+    pendingArea_.clear();
     redrawPanorama();
     updateEditActions();
     updateStatus();
@@ -453,6 +650,13 @@ bool MainWindow::savePanoramaFile() {
                          : tr("The panorama couldn't be saved to %1.").arg(panoramaPath_);
     updateStatus();
     return saved;
+}
+
+QString MainWindow::selectedAreaNote() const {
+    if (selectedArea_ < 0) {
+        return {};
+    }
+    return QString::fromStdString(decisions_.patches[static_cast<std::size_t>(selectedArea_)].note);
 }
 
 QString MainWindow::selectedAreaPhoto() const {
@@ -470,9 +674,13 @@ void MainWindow::updateEditActions() {
         markAreaAction_->setChecked(false);
     }
     const bool selected = canEdit && selectedArea_ >= 0;
+    const bool target = canEdit && (selected || hasPendingArea());
+    removeObjectAction_->setEnabled(target);
+    keepObjectAction_->setEnabled(target);
+    describeFixAction_->setEnabled(target);
     nextAreaPhotoAction_->setEnabled(selected);
     previousAreaPhotoAction_->setEnabled(selected);
-    deleteAreaAction_->setEnabled(selected);
+    deleteAreaAction_->setEnabled(target);
     undoAction_->setEnabled(canEdit && !undoStack_.empty());
     redoAction_->setEnabled(canEdit && !redoStack_.empty());
     savePanoramaAction_->setEnabled(!panorama_.isNull());
@@ -492,6 +700,7 @@ void MainWindow::showPhoto(int row) {
     }
     currentRow_ = row;
     showingPanorama_ = false;
+    pendingArea_.clear();
     view_->setOutlines({}, -1);
     updateEditActions();
     previewLoader_->cancelPending();
@@ -548,10 +757,11 @@ void MainWindow::updateStatus() {
             tr("Stitching photo %1 of %2…").arg(stitchJob_->done()).arg(stitchJob_->total());
     }
     if (selectedArea_ >= 0) {
-        positionLabel_->setText(tr("Area %1 of %2, from %3   |   [ and ] change the photo")
-                                    .arg(selectedArea_ + 1)
-                                    .arg(areaCount())
-                                    .arg(selectedAreaPhoto()));
+        const QString photo = selectedAreaPhoto();
+        positionLabel_->setText(
+            photo.isEmpty()
+                ? tr("Area %1 of %2, waiting for the AI").arg(selectedArea_ + 1).arg(areaCount())
+                : tr("Area %1 of %2, from %3").arg(selectedArea_ + 1).arg(areaCount()).arg(photo));
     }
     if (!editMessage_.isEmpty()) {
         positionLabel_->setText(positionLabel_->text() + QStringLiteral("   |   ") + editMessage_);

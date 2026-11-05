@@ -20,6 +20,7 @@ class PhotoViewTest : public QObject {
     void rightButtonStillPansInLassoMode();
     void aClickReportsItsImagePoint();
     void aDragIsNotAClick();
+    void aRightClickReportsItsImagePoint();
     void outlinesAreDrawnOverTheImage();
     void startsEmptyWithAMessage();
     void fitsAnImageInsideTheWidget();
@@ -254,6 +255,18 @@ void PhotoViewTest::aDragIsNotAClick() {
     QApplication::sendEvent(&view, &move);
     QTest::mouseRelease(&view, Qt::LeftButton, Qt::NoModifier, QPoint(60, 20));
     QCOMPARE(clicked.count(), 0);
+}
+
+void PhotoViewTest::aRightClickReportsItsImagePoint() {
+    PhotoView view;
+    view.resize(400, 200);
+    QImage image(800, 400, QImage::Format_RGB32);
+    image.fill(Qt::gray);
+    view.setImage(image);
+    QSignalSpy clicked(&view, &PhotoView::imageRightClicked);
+    QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, QPoint(10, 20));
+    QCOMPARE(clicked.count(), 1);
+    QCOMPARE(clicked.at(0).at(0).toPointF(), QPointF(20.0, 40.0));
 }
 
 void PhotoViewTest::outlinesAreDrawnOverTheImage() {
