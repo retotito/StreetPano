@@ -37,7 +37,9 @@ flowchart LR
   Python tool
 - [ ] Find camera positions from the app, in C++
 - [x] Read focal length from photo metadata
-- [ ] Test camera positions on real photos
+- [x] Test camera positions on real photos: 26 of 27 phone photos of a real street
+  connect, with [checked paths and joined sections](adr/0011-check-and-join-camera-paths.md)
+- [ ] Make the facade plane stable, because its angle still varies between runs
 - [x] Fit one facade plane, with verticals from the average camera direction
 - [ ] Follow curved streets and different building setbacks
 - [ ] Choose a [licence-compatible graph cut](concept/ai-models.md)
@@ -77,6 +79,8 @@ See the [planned workflow](concept/ui-workflow.md).
 - [ ] Resume after a crash
 - [ ] Test on 1 km or more, including curved streets and hills
 - [ ] Slope modes
+- [ ] [Straight and true-shape output](concept/geometry-correction.md#curved-streets-and-buildings)
+  for curved streets and buildings
 
 **Done when:** 1 km renders on an 8 GB computer within its memory budget.
 
@@ -87,3 +91,11 @@ See the [planned workflow](concept/ui-workflow.md).
 - [ ] Show real and generated shares
 
 **Done when:** every generated pixel can be identified in the output.
+
+## Ideas for later
+
+Not planned yet.
+
+- Optional building outlines from open map data, such as OpenStreetMap or swisstopo,
+  to guide facade shapes, give real distances and help connect separate parts of a
+  street. The app must still work offline and where map data is poor.

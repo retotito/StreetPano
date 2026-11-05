@@ -1,20 +1,27 @@
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 import pytest
 from PIL import Image
 
+import streetpano.poses as poses_module
 from streetpano.poses import (
     AccuracyReport,
     CameraPose,
     PoseEstimate,
     PoseEstimationError,
+    Section,
     compare_with_truth,
     estimate_poses,
     focal_from_metadata,
+    join_sections,
     list_photos,
+    path_problems,
+    section_problems,
+    select_sections,
+    split_points,
     up_in_camera,
     write_estimate,
 )
@@ -278,3 +285,287 @@ def test_focal_length_comes_from_metadata(tmp_path: Path) -> None:
 def test_missing_focal_length_gives_a_clear_error(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="--focal-px"):
         focal_from_metadata(save_photo(tmp_path / "a.jpg"))
+
+
+def straight_walk(count: int = 10, step: float = 1.0) -> tuple[Any, Any]:
+    centers = np.array([[index * step, 0.0, 0.0] for index in range(count)])
+    forwards = np.tile([0.0, 0.0, 1.0], (count, 1))
+    return centers, forwards
+
+
+def turned_by(degrees: float) -> list[float]:
+    angle = np.radians(degrees)
+    return [float(np.sin(angle)), 0.0, float(np.cos(angle))]
+
+
+class TestPathChecks:
+    def test_a_steady_walk_has_no_problems(self) -> None:
+        centers, forwards = straight_walk()
+        assert path_problems(centers, forwards) == []
+        assert split_points(centers, forwards) == []
+
+    def test_too_few_photos_cant_be_judged(self) -> None:
+        centers, forwards = straight_walk(2)
+        assert path_problems(centers, forwards) == []
+        assert split_points(centers, forwards) == []
+
+    def test_cameras_that_dont_move_are_a_problem(self) -> None:
+        centers, forwards = straight_walk(step=0.0)
+        assert path_problems(centers, forwards) == ["the cameras don't move"]
+
+    def test_a_jump_is_a_problem_and_a_place_to_split(self) -> None:
+        centers, forwards = straight_walk()
+        centers[5:] += [20.0, 0.0, 0.0]
+        assert "21 times" in path_problems(centers, forwards)[0]
+        assert split_points(centers, forwards) == [4]
+
+    def test_a_very_short_step_is_a_place_to_split(self) -> None:
+        centers, forwards = straight_walk()
+        centers[5:] -= [0.8, 0.0, 0.0]
+        assert split_points(centers, forwards) == [4]
+
+    def test_a_sudden_turn_is_a_problem_and_a_place_to_split(self) -> None:
+        centers, forwards = straight_walk()
+        forwards[5:] = turned_by(40)
+        assert any("40 degrees" in item for item in path_problems(centers, forwards))
+        assert split_points(centers, forwards) == [4]
+
+    def test_a_slow_turn_along_the_street_is_fine(self) -> None:
+        centers, forwards = straight_walk()
+        forwards = np.array([turned_by(5.0 * index) for index in range(10)])
+        assert path_problems(centers, forwards) == []
+
+    def test_collapsed_cameras_are_a_problem(self) -> None:
+        # Measured on a real street: part of the walk shrank to almost one spot.
+        steps = [1.0] * 8 + [0.001] * 5
+        centers = np.array([[x, 0.0, 0.0] for x in np.cumsum([0.0, *steps])])
+        forwards = np.tile([0.0, 0.0, 1.0], (len(centers), 1))
+        assert "many cameras are in almost the same place" in path_problems(
+            centers, forwards
+        )
+
+    def test_a_sudden_change_of_scale_is_a_problem(self) -> None:
+        # Measured on a real street: one half came out at about 60% of the other's size.
+        steps = [0.33] * 12 + [0.55] * 13
+        centers = np.array([[x, 0.0, 0.0] for x in np.cumsum([0.0, *steps])])
+        forwards = np.tile([0.0, 0.0, 1.0], (len(centers), 1))
+        assert path_problems(centers, forwards) == [
+            "the step size changes suddenly along the street"
+        ]
+
+
+def section(
+    first: int,
+    count: int,
+    scale: float = 1.0,
+    world: Any = None,
+    offset: Any = (0.0, 0.0, 0.0),
+) -> Section:
+    """A straight walk along X, seen in another world if asked."""
+    rotation = np.eye(3) if world is None else np.array(world)
+    poses = tuple(
+        CameraPose(
+            name=f"{first + index:05d}.jpg",
+            center=tuple(scale * rotation @ [float(index), 0.0, 0.0] + offset),
+            rotation_world_to_camera=tuple(tuple(row) for row in rotation.T),
+        )
+        for index in range(count)
+    )
+    points = scale * (rotation @ np.array([[float(count), 1.0, 5.0]]).T).T + offset
+    return Section(poses, points, 1.0)
+
+
+class TestSections:
+    ORDER: ClassVar[dict[str, int]] = {f"{index:05d}.jpg": index for index in range(30)}
+
+    def test_largest_sections_win_when_they_share_photos(self) -> None:
+        chosen = select_sections(
+            [section(0, 4), section(3, 8), section(11, 3)], self.ORDER
+        )
+        assert [item.poses[0].name for item in chosen] == ["00003.jpg", "00011.jpg"]
+
+    def test_a_bad_section_is_reported(self) -> None:
+        bad = section(0, 10)
+        centers = [list(pose.center) for pose in bad.poses]
+        centers[5][0] += 50
+        poses = tuple(
+            CameraPose(p.name, (c[0], c[1], c[2]), p.rotation_world_to_camera)
+            for p, c in zip(bad.poses, centers, strict=True)
+        )
+        assert section_problems(Section(poses, bad.points, 1.0))
+
+    def test_joining_undoes_the_second_sections_own_world(self) -> None:
+        turn = np.array([[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]])
+        joined = join_sections(
+            section(0, 5),
+            section(5, 4, scale=0.5, world=turn, offset=np.array([3.0, -2.0, 7.0])),
+            np.eye(3),
+            np.array([1.0, 0.0, 0.0]),
+            1,
+        )
+        assert joined is not None
+        centers = np.array([pose.center for pose in joined.poses])
+        assert centers == pytest.approx(
+            np.array([[float(index), 0.0, 0.0] for index in range(9)])
+        )
+        for pose in joined.poses:
+            assert np.array(pose.rotation_world_to_camera) == pytest.approx(np.eye(3))
+        # The second section's point keeps its place relative to its cameras.
+        assert joined.points[-1] == pytest.approx([9.0, 1.0, 5.0])
+
+    def test_a_missing_photo_leaves_room_for_it(self) -> None:
+        joined = join_sections(
+            section(0, 5), section(6, 4), np.eye(3), np.array([1.0, 0.0, 0.0]), 2
+        )
+        assert joined is not None
+        assert joined.poses[5].center == pytest.approx((6.0, 0.0, 0.0))
+
+    def test_a_join_against_the_walking_direction_is_refused(self) -> None:
+        assert (
+            join_sections(
+                section(0, 5), section(5, 4), np.eye(3), np.array([-1.0, 0.0, 0.0]), 1
+            )
+            is None
+        )
+
+    @pytest.mark.parametrize("sizes", [(1, 4), (4, 1)])
+    def test_a_single_photo_has_no_usual_step(self, sizes: tuple[int, int]) -> None:
+        assert (
+            join_sections(
+                section(0, sizes[0]),
+                section(5, sizes[1]),
+                np.eye(3),
+                np.array([1.0, 0.0, 0.0]),
+                1,
+            )
+            is None
+        )
+
+    def test_sections_that_dont_move_cant_be_joined(self) -> None:
+        assert (
+            join_sections(
+                section(0, 4),
+                section(5, 4, scale=0.0),
+                np.eye(3),
+                np.array([1.0, 0.0, 0.0]),
+                1,
+            )
+            is None
+        )
+
+
+def split_estimate(estimate: PoseEstimate) -> list[Section]:
+    middle = len(estimate.poses) // 2
+    first = Section(estimate.poses[:middle], estimate.points, 1.0)
+    # The second part gets its own world, as COLMAP gives a separate part.
+    turn = np.array([[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]])
+    moved = tuple(
+        CameraPose(
+            pose.name,
+            tuple(0.5 * turn @ np.array(pose.center)),
+            tuple(
+                tuple(row) for row in np.array(pose.rotation_world_to_camera) @ turn.T
+            ),
+            pose.up_in_camera,
+        )
+        for pose in estimate.poses[middle:]
+    )
+    return [first, Section(moved, np.empty((0, 3)), 1.0)]
+
+
+@pytest.fixture(scope="module")
+def work(street: Path, tmp_path_factory: pytest.TempPathFactory) -> Any:
+    import pycolmap
+
+    work = tmp_path_factory.mktemp("connect")
+    estimate = estimate_poses(street / "photos", work, CAMERA.focal_px)
+    order = {pose.name: index for index, pose in enumerate(estimate.poses)}
+    return pycolmap, work / "database.db", estimate, order
+
+
+class TestConnectingSectionsWithCOLMAP:
+    def test_separate_parts_rejoin_into_one_street(self, work: Any) -> None:
+        pycolmap, database, estimate, order = work
+        joined = poses_module._connect_sections(
+            pycolmap, database, split_estimate(estimate), order
+        )
+        assert joined is not None
+        assert [pose.name for pose in joined.poses] == [
+            pose.name for pose in estimate.poses
+        ]
+        assert not section_problems(joined)
+        # The path keeps its shape, compared in steps to allow for the assumed scale.
+        centers = np.array([pose.center for pose in joined.poses])
+        truth = np.array([pose.center for pose in estimate.poses])
+        steps = np.linalg.norm(np.diff(centers, axis=0), axis=1)
+        true_steps = np.linalg.norm(np.diff(truth, axis=0), axis=1)
+        assert steps == pytest.approx(true_steps, rel=0.1)
+
+    def test_nothing_to_connect(self, work: Any) -> None:
+        pycolmap, database, _, order = work
+        assert poses_module._connect_sections(pycolmap, database, [], order) is None
+
+    def test_too_few_matches_leaves_the_longest_part(
+        self, work: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        pycolmap, database, estimate, order = work
+        monkeypatch.setattr(poses_module, "_MIN_JOIN_MATCHES", 10**9)
+        parts = split_estimate(estimate)
+        joined = poses_module._connect_sections(pycolmap, database, parts, order)
+        assert joined is not None
+        assert len(joined.poses) == max(len(part.poses) for part in parts)
+
+    def test_a_wide_gap_isnt_bridged(self, work: Any) -> None:
+        pycolmap, database, estimate, order = work
+        first, second = split_estimate(estimate)
+        wide = Section(second.poses[3:], second.points, 1.0)
+        joined = poses_module._connect_sections(
+            pycolmap, database, [first, wide], order
+        )
+        assert joined is not None
+        assert len(joined.poses) == max(len(first.poses), len(wide.poses))
+
+    def test_a_failed_estimate_of_the_gap_leaves_the_parts(
+        self, work: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        pycolmap, database, estimate, order = work
+        monkeypatch.setattr(pycolmap, "estimate_essential_matrix", lambda *_: None)
+        parts = split_estimate(estimate)
+        joined = poses_module._connect_sections(pycolmap, database, parts, order)
+        assert joined is not None
+        assert len(joined.poses) == max(len(part.poses) for part in parts)
+
+
+class TestEstimateFallbacks:
+    def fake_mapping(
+        self, monkeypatch: pytest.MonkeyPatch, sections: list[Section]
+    ) -> None:
+        monkeypatch.setattr(
+            poses_module, "_map_sections", lambda *_: sections, raising=True
+        )
+
+    def test_no_reconstruction_is_an_error(
+        self, street: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self.fake_mapping(monkeypatch, [])
+        with pytest.raises(PoseEstimationError):
+            estimate_poses(street / "photos", tmp_path / "work", CAMERA.focal_px)
+
+    def test_an_impossible_path_is_used_with_a_warning(
+        self, street: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        photos = list_photos(street / "photos")
+        steps = [0.0, 1.0, 1.0, 1.0, 9.0, 1.0, 1.0, 1.0]
+        positions = np.cumsum(steps)
+        poses = tuple(
+            CameraPose(
+                photo.name,
+                (float(x), 0.0, 0.0),
+                ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)),
+            )
+            for photo, x in zip(photos, positions, strict=False)
+        )
+        self.fake_mapping(monkeypatch, [Section(poses, np.zeros((1, 3)), 1.0)])
+        result = estimate_poses(street / "photos", tmp_path / "work", CAMERA.focal_px)
+        assert "looks wrong" in result.warnings[0]
+        assert len(result.poses) == len(steps)

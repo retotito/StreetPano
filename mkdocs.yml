@@ -59,3 +59,4 @@ nav:
       - "0008: Fixed focal length": adr/0008-fixed-focal-length.md
       - "0009: Svelte and FastAPI for the interface": adr/0009-web-ui-stack.md
       - "0010: C++ and Qt for the application": adr/0010-cpp-and-qt.md
+      - "0011: Check camera paths and join sections": adr/0011-check-and-join-camera-paths.md

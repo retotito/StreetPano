@@ -143,6 +143,8 @@ def run_poses(args: argparse.Namespace) -> None:
     print(f"Registered {len(estimate.poses)} photos")
     if estimate.missing:
         print(f"Missing: {', '.join(estimate.missing)}")
+    for warning in estimate.warnings:
+        print(f"Warning: {warning}")
     print(f"Mean reprojection error: {estimate.mean_reprojection_error_px:.2f} px")
     if args.truth is not None:
         description = json.loads(args.truth.read_text(encoding="utf-8"))
