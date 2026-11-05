@@ -65,26 +65,28 @@ constexpr double kEndExtensionDistances = 8.0;
     return sum / static_cast<double>(count);
 }
 
-// Fills cameras without a measurement from the nearest measurements on either side.
-void fillGaps(std::vector<std::optional<double>>& depths) {
-    const std::size_t count = depths.size();
+// Gives cameras without a measurement a value between the nearest measurements on either side.
+[[nodiscard]] std::vector<double> withGapsFilled(std::span<const std::optional<double>> measured,
+                                                 double fallback) {
+    const std::size_t count = measured.size();
+    std::vector<double> filled;
+    filled.reserve(count);
     for (std::size_t index = 0; index < count; ++index) {
-        if (depths[index].has_value()) {
+        if (measured[index].has_value()) {
+            filled.push_back(measured[index].value_or(fallback));
             continue;
         }
         std::size_t next = index + 1;
-        while (next < count && !depths[next].has_value()) {
+        while (next < count && !measured[next].has_value()) {
             ++next;
         }
-        if (index == 0) {
-            depths[index] = depths[next];
-        } else if (next == count) {
-            depths[index] = depths[index - 1];
-        } else {
-            const double share = 1.0 / static_cast<double>(next - index + 1);
-            depths[index] = *depths[index - 1] + (*depths[next] - *depths[index - 1]) * share;
-        }
+        const double after = next < count ? measured[next].value_or(fallback) : fallback;
+        const double before = index > 0 ? filled.back() : after;
+        const double target = next < count ? after : before;
+        const double share = 1.0 / static_cast<double>(next - index + 1);
+        filled.push_back(before + (target - before) * share);
     }
+    return filled;
 }
 
 [[nodiscard]] std::vector<double> medianFiltered(std::span<const double> values) {
@@ -270,13 +272,7 @@ SurfaceResult fitFacadeSurface(std::span<const CameraPose> poses, std::span<cons
         result.error = "No facade was found near the cameras.";
         return result;
     }
-    fillGaps(measured);
-    std::vector<double> plain;
-    plain.reserve(count);
-    for (const std::optional<double>& depth : measured) {
-        plain.push_back(*depth);
-    }
-    std::vector<double> depths = medianFiltered(plain);
+    std::vector<double> depths = medianFiltered(withGapsFilled(measured, typicalDepth));
     limitSlope(depths, path);
 
     FacadeSurface surface;
