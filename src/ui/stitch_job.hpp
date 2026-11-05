@@ -37,8 +37,13 @@ class StitchJob : public QObject {
     [[nodiscard]] const QString& outputPath() const { return outputPath_; }
 
   signals:
+    // Both are always emitted on the owner's thread, so they're safe to connect directly.
     void progressChanged();
     void finished();
+
+    // Emitted on the worker thread. Only this class connects to these.
+    void workerProgressed(QPrivateSignal);
+    void workerFinished(QPrivateSignal);
 
   private:
     void run();

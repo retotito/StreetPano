@@ -11,7 +11,11 @@ StitchJob::StitchJob(QString posesPath, const QDir& photoFolder, QString outputP
     : QObject(parent),
       posesPath_(std::move(posesPath)),
       photoFolder_(photoFolder),
-      outputPath_(std::move(outputPath)) {}
+      outputPath_(std::move(outputPath)) {
+    connect(this, &StitchJob::workerProgressed, this, &StitchJob::progressChanged,
+            Qt::QueuedConnection);
+    connect(this, &StitchJob::workerFinished, this, &StitchJob::finished, Qt::QueuedConnection);
+}
 
 StitchJob::~StitchJob() {
     cancel_.store(true);
@@ -35,7 +39,7 @@ void StitchJob::run() {
             [this](int done, int total) {
                 done_.store(done);
                 total_.store(total);
-                emit progressChanged();
+                emit workerProgressed(QPrivateSignal{});
             },
             &cancel_);
         if (!result.panorama.isNull() && !result.panorama.save(outputPath_, nullptr, 95)) {
@@ -49,7 +53,7 @@ void StitchJob::run() {
         const std::scoped_lock lock(mutex_);
         result_ = std::move(result);
     }
-    emit finished();
+    emit workerFinished(QPrivateSignal{});
 }
 
 stitch::StitchResult StitchJob::takeResult() {

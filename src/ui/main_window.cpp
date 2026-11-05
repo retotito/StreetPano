@@ -190,10 +190,8 @@ bool MainWindow::startStitch(const QString& posesPath) {
     const QString output =
         QFileInfo(posesPath).absoluteDir().filePath(QStringLiteral("panorama.jpg"));
     stitchJob_ = std::make_unique<StitchJob>(posesPath, QDir(currentFolder_), output);
-    connect(stitchJob_.get(), &StitchJob::progressChanged, this, &MainWindow::updateStatus,
-            Qt::QueuedConnection);
-    connect(stitchJob_.get(), &StitchJob::finished, this, &MainWindow::onStitchFinished,
-            Qt::QueuedConnection);
+    connect(stitchJob_.get(), &StitchJob::progressChanged, this, &MainWindow::updateStatus);
+    connect(stitchJob_.get(), &StitchJob::finished, this, &MainWindow::onStitchFinished);
     stitchMessage_ = tr("Stitching…");
     stitchJob_->start();
     updateStatus();

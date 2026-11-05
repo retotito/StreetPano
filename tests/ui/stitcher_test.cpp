@@ -39,6 +39,7 @@ class StitcherTest : public QObject {
     void failsClearlyWithoutPhotos();
     void failsClearlyWithoutPoints();
     void jobDeliversAResult();
+    void jobSignalsArriveOnTheOwnerThread();
     void jobReportsABadFile();
     void jobCanBeDestroyedWhileRunning();
     void windowStitchesAndShowsThePanorama();
@@ -227,6 +228,27 @@ void StitcherTest::jobDeliversAResult() {
     QCOMPARE(job.total(), kPhotos);
     QVERIFY(QFile::exists(output));
     QCOMPARE(job.outputPath(), output);
+}
+
+void StitcherTest::jobSignalsArriveOnTheOwnerThread() {
+    const Street street;
+    StitchJob job(street.posesPath, QDir(street.folder.path()),
+                  street.folder.filePath(QStringLiteral("out.png")));
+    // Direct connections run on the emitting thread, which must be this one.
+    bool alwaysOwnerThread = true;
+    bool finished = false;
+    const auto check = [&] { alwaysOwnerThread &= QThread::currentThread() == thread(); };
+    connect(&job, &StitchJob::progressChanged, this, check, Qt::DirectConnection);
+    connect(
+        &job, &StitchJob::finished, this,
+        [&] {
+            check();
+            finished = true;
+        },
+        Qt::DirectConnection);
+    job.start();
+    QTRY_VERIFY_WITH_TIMEOUT(finished, 30000);
+    QVERIFY(alwaysOwnerThread);
 }
 
 void StitcherTest::jobReportsABadFile() {
