@@ -5,6 +5,7 @@ straight line, a longer lens and a more distant wall look almost identical, so
 letting COLMAP adjust the focal length gives wrong depths. See decision record 0008.
 """
 
+import itertools
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -40,6 +41,27 @@ _MAX_IMAGE_SIZE_PX = 2000
 _MAX_FEATURES = 5000
 _NEIGHBOUR_PHOTOS = 8
 
+# On a real street, COLMAP can split the photos at a weak link, and part of the result
+# differs from run to run. Repeating this quick step and checking each result costs
+# little, because the slow matching runs only once.
+_MAPPING_ATTEMPTS = 5
+
+# Limits for a believable walk, as multiples of the usual step. False matches between
+# repeating windows can give a low reprojection error and an impossible path, so that
+# error alone can't be trusted.
+_MAX_STEP_RATIO = 3.0
+_MIN_STEP_RATIO = 0.1
+_MAX_SHORT_STEP_SHARE = 0.2
+_MAX_TURN_DEG = 30.0
+_MAX_PACE_CHANGE = 1.5
+_MIN_STEPS_PER_SIDE = 3
+_MIN_SECTION_PHOTOS = 2
+
+# Limits for joining two sections at a gap.
+_MIN_JOIN_MATCHES = 20
+_MAX_JOIN_GAP_PHOTOS = 2
+_MAX_JOIN_ANGLE_DEG = 45.0
+
 
 class PoseEstimationError(RuntimeError):
     """COLMAP couldn't build a reconstruction from the photos."""
@@ -63,6 +85,16 @@ class PoseEstimate:
     points: FloatArray
     focal_px: float
     missing: tuple[str, ...]
+    mean_reprojection_error_px: float
+    warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class Section:
+    """An unbroken run of photos that COLMAP placed together, in photo order."""
+
+    poses: tuple[CameraPose, ...]
+    points: FloatArray
     mean_reprojection_error_px: float
 
 
@@ -121,7 +153,8 @@ def estimate_poses(photo_dir: Path, work_dir: Path, focal_px: float) -> PoseEsti
     """Reconstruct camera positions, using the known focal length.
 
     ``work_dir`` must be new or empty. All photos must come from one camera at one
-    zoom setting, and lens distortion must already be removed.
+    zoom setting, and lens distortion must already be removed. COLMAP's result varies
+    from run to run on real streets, so this one can vary too.
     """
     import pycolmap
 
@@ -158,40 +191,328 @@ def estimate_poses(photo_dir: Path, work_dir: Path, focal_px: float) -> PoseEsti
         database, pairing_options=pairing, device=pycolmap.Device.cpu
     )
 
+    order = {photo.name: index for index, photo in enumerate(photos)}
+    best: Section | None = None
+    fallback: Section | None = None
+    warnings: list[str] = []
+    for attempt in range(_MAPPING_ATTEMPTS):
+        sections = _map_sections(pycolmap, database, photo_dir, work_dir, attempt)
+        good = select_sections(
+            [section for section in sections if not section_problems(section)], order
+        )
+        joined = _connect_sections(pycolmap, database, good, order)
+        if joined is not None and (best is None or _quality(joined) > _quality(best)):
+            best = joined
+        for section in sections:
+            if fallback is None or len(section.poses) > len(fallback.poses):
+                fallback = section
+        if best is not None and len(best.poses) == len(photos):
+            break
+    if best is None:
+        if fallback is None:
+            raise PoseEstimationError("COLMAP couldn't connect the photos")
+        best = fallback
+        warnings = [
+            "The camera path looks wrong, so please check the result: "
+            + "; ".join(section_problems(fallback))
+        ]
+
+    registered = {pose.name for pose in best.poses}
+    return PoseEstimate(
+        poses=best.poses,
+        points=best.points,
+        focal_px=focal_px,
+        missing=tuple(p.name for p in photos if p.name not in registered),
+        mean_reprojection_error_px=best.mean_reprojection_error_px,
+        warnings=tuple(warnings),
+    )
+
+
+def path_problems(centers: FloatArray, forwards: FloatArray) -> list[str]:
+    """Return why a walk along a street is impossible, or nothing if it's believable.
+
+    Photos must be in order, and they're expected to be roughly evenly spaced.
+    """
+    if len(centers) < 3:
+        return []
+    steps = np.linalg.norm(np.diff(centers, axis=0), axis=1)
+    usual = float(np.median(steps))
+    if usual <= 0:
+        return ["the cameras don't move"]
+    problems = []
+    if steps.max() > _MAX_STEP_RATIO * usual:
+        problems.append(f"one step is {steps.max() / usual:.0f} times the usual size")
+    if np.mean(steps < _MIN_STEP_RATIO * usual) > _MAX_SHORT_STEP_SHARE:
+        problems.append("many cameras are in almost the same place")
+    cosines = np.clip(np.sum(forwards[1:] * forwards[:-1], axis=1), -1, 1)
+    turn = float(np.degrees(np.arccos(cosines)).max())
+    if turn > _MAX_TURN_DEG:
+        problems.append(f"the camera turns {turn:.0f} degrees between two photos")
+    for split in range(_MIN_STEPS_PER_SIDE, len(steps) - _MIN_STEPS_PER_SIDE + 1):
+        before = float(np.median(steps[:split]))
+        after = float(np.median(steps[split:]))
+        if max(before, after) > _MAX_PACE_CHANGE * min(before, after):
+            problems.append("the step size changes suddenly along the street")
+            break
+    return problems
+
+
+def split_points(centers: FloatArray, forwards: FloatArray) -> list[int]:
+    """Return the photos after which the path breaks: an odd step or a sudden turn."""
+    if len(centers) < 3:
+        return []
+    steps = np.linalg.norm(np.diff(centers, axis=0), axis=1)
+    usual = float(np.median(steps))
+    cosines = np.clip(np.sum(forwards[1:] * forwards[:-1], axis=1), -1, 1)
+    turns = np.degrees(np.arccos(cosines))
+    breaks = (
+        (steps > _MAX_STEP_RATIO * usual)
+        | (steps < usual / _MAX_STEP_RATIO)
+        | (turns > _MAX_TURN_DEG)
+    )
+    return [int(index) for index in np.flatnonzero(breaks)]
+
+
+def section_problems(section: Section) -> list[str]:
+    """Return why a section's path is impossible, or nothing if it's believable."""
+    centers = np.array([pose.center for pose in section.poses], dtype=np.float64)
+    forwards = np.array(
+        [pose.rotation_world_to_camera[2] for pose in section.poses], dtype=np.float64
+    )
+    return path_problems(centers, forwards)
+
+
+def select_sections(sections: list[Section], order: dict[str, int]) -> list[Section]:
+    """Keep the largest sections that don't share photos, in photo order."""
+    used: set[str] = set()
+    chosen = []
+    for section in sorted(sections, key=lambda item: -len(item.poses)):
+        names = {pose.name for pose in section.poses}
+        if not names & used:
+            used |= names
+            chosen.append(section)
+    return sorted(chosen, key=lambda item: order[item.poses[0].name])
+
+
+def join_sections(
+    first: Section,
+    second: Section,
+    rotation_second_from_first: FloatArray,
+    direction_in_first: FloatArray,
+    photo_gap: int,
+) -> Section | None:
+    """Move ``second`` into the world of ``first``, or return None if they don't fit.
+
+    The rotation and direction relate the last photo of ``first`` to the first photo of
+    ``second``, in the coordinates of that last photo. Two photos can't give the length
+    of the step between them, or the sections' relative scale. Both come from the usual
+    step in each section, which assumes a steady walking pace across the gap. Measuring
+    the distance to the buildings instead proved too noisy, because a tree or a van can
+    dominate a single photo.
+    """
+    if len(first.poses) < 2 or len(second.poses) < 2:
+        return None
+    last = first.poses[-1]
+    start = second.poses[0]
+    last_rotation = np.array(last.rotation_world_to_camera)
+    last_center = np.array(last.center)
+    start_center = np.array(start.center)
+
+    first_centers = np.array([pose.center for pose in first.poses])
+    first_step = _usual_step(first_centers)
+    second_step = _usual_step(np.array([pose.center for pose in second.poses]))
+    if first_step <= 0 or second_step <= 0:
+        return None
+    scale = first_step / second_step
+
+    direction = last_rotation.T @ direction_in_first
+    walking = last_center - first_centers[-2]
+    cosine = float(
+        np.dot(direction, walking)
+        / (np.linalg.norm(direction) * np.linalg.norm(walking))
+    )
+    if float(np.degrees(np.arccos(np.clip(cosine, -1, 1)))) > _MAX_JOIN_ANGLE_DEG:
+        return None
+    new_start = last_center + direction / np.linalg.norm(direction) * (
+        first_step * photo_gap
+    )
+
+    # Takes directions in the second section's world to the first section's world.
+    start_rotation = np.array(start.rotation_world_to_camera)
+    world = (rotation_second_from_first @ last_rotation).T @ start_rotation
+
+    def moved(point: FloatArray) -> FloatArray:
+        return np.asarray(
+            new_start + scale * world @ (point - start_center), dtype=np.float64
+        )
+
+    moved_poses = tuple(
+        CameraPose(
+            name=pose.name,
+            center=_vector(moved(np.array(pose.center))),
+            rotation_world_to_camera=tuple(
+                _vector(row)
+                for row in np.array(pose.rotation_world_to_camera) @ world.T
+            ),
+            up_in_camera=pose.up_in_camera,
+        )
+        for pose in second.poses
+    )
+    moved_points = (
+        new_start + scale * (second.points - start_center) @ world.T
+        if len(second.points)
+        else second.points
+    )
+    total_points = len(first.points) + len(second.points)
+    error = (
+        first.mean_reprojection_error_px * len(first.points)
+        + second.mean_reprojection_error_px * len(second.points)
+    ) / max(total_points, 1)
+    return Section(
+        poses=first.poses + moved_poses,
+        points=np.concatenate([first.points, moved_points]),
+        mean_reprojection_error_px=float(error),
+    )
+
+
+def _map_sections(
+    pycolmap: Any, database: Path, photo_dir: Path, work_dir: Path, attempt: int
+) -> list[Section]:
     options = pycolmap.IncrementalPipelineOptions()
     options.ba_refine_focal_length = False
     options.ba_refine_principal_point = False
     options.ba_refine_extra_params = False
+    output = work_dir / "sparse" / str(attempt)
+    output.mkdir(parents=True)
     reconstructions = pycolmap.incremental_mapping(
-        database, photo_dir, work_dir / "sparse", options=options
+        database, photo_dir, output, options=options
     )
-    if not reconstructions:
-        raise PoseEstimationError("COLMAP couldn't connect the photos")
+    sections: list[Section] = []
+    for reconstruction in reconstructions.values():
+        sections += _sections_from(reconstruction, photo_dir)
+    return sections
 
-    # A broken sequence can produce several parts. Keep the largest, and report the
-    # other photos as missing instead of hiding them.
-    largest = max(reconstructions.values(), key=lambda item: item.num_reg_images())
-    poses = []
-    for image in largest.images.values():
-        if image.has_pose:
-            rotation = image.cam_from_world().rotation.matrix()
-            poses.append(
-                CameraPose(
-                    name=image.name,
-                    center=_vector(image.projection_center()),
-                    rotation_world_to_camera=tuple(_vector(row) for row in rotation),
-                    up_in_camera=up_in_camera(photo_dir / image.name),
-                )
-            )
-    poses.sort(key=lambda pose: pose.name)
-    registered = {pose.name for pose in poses}
-    return PoseEstimate(
-        poses=tuple(poses),
-        points=np.array([point.xyz for point in largest.points3D.values()]),
-        focal_px=focal_px,
-        missing=tuple(p.name for p in photos if p.name not in registered),
-        mean_reprojection_error_px=float(largest.compute_mean_reprojection_error()),
+
+def _sections_from(reconstruction: Any, photo_dir: Path) -> list[Section]:
+    """Split a reconstruction wherever its path breaks, and keep the usable parts."""
+    images = sorted(
+        (image for image in reconstruction.images.values() if image.has_pose),
+        key=lambda image: image.name,
     )
+    if not images:
+        return []
+    centers = np.array([image.projection_center() for image in images])
+    forwards = np.array(
+        [image.cam_from_world().rotation.matrix()[2] for image in images]
+    )
+    starts = [0, *(index + 1 for index in split_points(centers, forwards)), len(images)]
+    return [
+        _section_from(reconstruction, images[start:end], photo_dir)
+        for start, end in itertools.pairwise(starts)
+        if end - start >= _MIN_SECTION_PHOTOS
+    ]
+
+
+def _section_from(reconstruction: Any, images: list[Any], photo_dir: Path) -> Section:
+    poses = []
+    for image in images:
+        rotation = image.cam_from_world().rotation.matrix()
+        poses.append(
+            CameraPose(
+                name=image.name,
+                center=_vector(image.projection_center()),
+                rotation_world_to_camera=tuple(_vector(row) for row in rotation),
+                up_in_camera=up_in_camera(photo_dir / image.name),
+            )
+        )
+    ids = {image.image_id for image in images}
+    return Section(
+        poses=tuple(poses),
+        points=np.array(
+            [
+                point.xyz
+                for point in reconstruction.points3D.values()
+                if any(item.image_id in ids for item in point.track.elements)
+            ],
+            dtype=np.float64,
+        ).reshape(-1, 3),
+        mean_reprojection_error_px=float(
+            reconstruction.compute_mean_reprojection_error()
+        ),
+    )
+
+
+def _quality(section: Section) -> tuple[int, float]:
+    """Rank results by the photos they cover, then by how even their steps are."""
+    centers = np.array([pose.center for pose in section.poses])
+    steps = np.linalg.norm(np.diff(centers, axis=0), axis=1)
+    return len(section.poses), -float(np.std(steps) / max(np.mean(steps), 1e-12))
+
+
+def _usual_step(centers: FloatArray) -> float:
+    return float(np.median(np.linalg.norm(np.diff(centers, axis=0), axis=1)))
+
+
+def _connect_sections(
+    pycolmap: Any, database: Path, sections: list[Section], order: dict[str, int]
+) -> Section | None:
+    """Join neighbouring sections where possible, and return the longest result."""
+    if not sections:
+        return None
+    joined = [sections[0]]
+    for section in sections[1:]:
+        result = _join_at_gap(pycolmap, database, joined[-1], section, order)
+        if result is None or section_problems(result):
+            joined.append(section)
+        else:
+            joined[-1] = result
+    return max(joined, key=lambda item: len(item.poses))
+
+
+def _join_at_gap(
+    pycolmap: Any,
+    database: Path,
+    first: Section,
+    second: Section,
+    order: dict[str, int],
+) -> Section | None:
+    last_name = first.poses[-1].name
+    start_name = second.poses[0].name
+    gap = order[start_name] - order[last_name]
+    if gap > _MAX_JOIN_GAP_PHOTOS:
+        return None
+    relative = _relative_pose(pycolmap, database, last_name, start_name)
+    if relative is None:
+        return None
+    return join_sections(first, second, relative[0], relative[1], gap)
+
+
+def _relative_pose(
+    pycolmap: Any, database: Path, first_name: str, second_name: str
+) -> tuple[FloatArray, FloatArray] | None:
+    """Return the rotation and walking direction between two photos' cameras."""
+    with pycolmap.Database.open(database) as store:
+        first = store.read_image_with_name(first_name)
+        second = store.read_image_with_name(second_name)
+        matches = store.read_two_view_geometry(
+            first.image_id, second.image_id
+        ).inlier_matches
+        if len(matches) < _MIN_JOIN_MATCHES:
+            return None
+        first_points = store.read_keypoints(first.image_id)[matches[:, 0], :2]
+        second_points = store.read_keypoints(second.image_id)[matches[:, 1], :2]
+        camera = store.read_camera(first.camera_id)
+    result = pycolmap.estimate_essential_matrix(
+        first_points.astype(np.float64),
+        second_points.astype(np.float64),
+        camera,
+        camera,
+    )
+    if result is None:
+        return None
+    pose = result["cam2_from_cam1"]
+    rotation = np.array(pose.rotation.matrix())
+    return rotation, -rotation.T @ np.array(pose.translation)
 
 
 def compare_with_truth(
@@ -251,6 +572,7 @@ def write_estimate(estimate: PoseEstimate, path: Path) -> None:
         "focal_px": estimate.focal_px,
         "missing": list(estimate.missing),
         "mean_reprojection_error_px": estimate.mean_reprojection_error_px,
+        "warnings": list(estimate.warnings),
         "poses": [
             {
                 "name": pose.name,

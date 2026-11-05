@@ -13,6 +13,8 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Camera positions on real streets: each result is checked as a walk, split where it
+  breaks, and joined again using neighbouring photos
 - First stitching: `scripts/stitch.sh` takes a folder of photos through to a panorama,
   with straight seams, shown in the app
 - Focal length read from photo metadata, and support for phones held any way round

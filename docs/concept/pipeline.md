@@ -87,6 +87,10 @@ straight path. VGGT is fast, but [pose reliability fell as image counts grew in 
 aerial benchmark](https://arxiv.org/abs/2507.14798), so it's a candidate only for
 short sections.
 
+COLMAP can split a real street at a weak link, or bend and collapse it while still
+reporting a low error. So each result is checked as a walk, split where it breaks, and
+[joined again](../adr/0011-check-and-join-camera-paths.md) using neighbouring photos.
+
 ### 3. Set verticals
 
 Estimate true "up" automatically, and accept manual corrections.

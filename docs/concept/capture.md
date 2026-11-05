@@ -68,6 +68,8 @@ A phone is a good way to try the workflow before committing to better equipment.
   you need upright framing to fit tall buildings. Keep the same orientation throughout.
 - **Avoid digital zoom and lens switching.** Some phones switch lenses by themselves,
   so check that the photos all look the same width.
+- **Walk at a steady pace.** Where the camera positions need joining at a gap, the
+  scale on each side comes from the usual step size.
 - **Choose a straight, flat 100 m first,** with few parked cars. Save hills and
   curves for later.
 
@@ -86,6 +88,9 @@ Copy the photos into their own folder, and then run:
 This reads the focal length from the photos, finds the camera positions, and opens the
 app with the panorama. If the photos don't record a 35 mm equivalent focal length, add
 the focal length in pixels after the folder name.
+
+RAW photos need converting to JPEG first for now, which drops the focal length from
+the converted files.
 
 The results go in a `my-street.streetpano` folder next to your photos. Delete that
 folder to start again. Your original photos are never changed.
