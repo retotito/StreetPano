@@ -4,15 +4,21 @@
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <random>
 
 namespace streetpano::core {
 namespace {
 
 constexpr std::size_t kMinPoints = 20;
-constexpr std::size_t kMinLocalPoints = 5;
 constexpr double kMinFacingRay = 0.05;  // Rays this close to parallel never reach the wall.
-constexpr std::size_t kTangentReach = 2;
-constexpr double kWindowSteps = 1.5;  // How far along the walk each camera looks for points.
+constexpr std::size_t kTangentReach = 4;
+constexpr int kLineAttempts = 300;
+constexpr std::size_t kMinLinePoints = 8;
+constexpr double kLineTolerance = 0.012;  // Of the typical depth.
+constexpr double kMaxLineSlope = 0.7;     // Facades run within about 35 degrees of the walk.
+constexpr double kMinLineSpanSteps = 1.0;
+constexpr std::size_t kSmoothReach = 2;
+constexpr double kWindowSteps = 4.0;  // How far along the walk each camera looks for points.
 constexpr double kBinShare = 0.05;    // Depth histogram bins, as a share of the typical depth.
 constexpr double kMaxHistogramDepths = 8.0;
 constexpr double kNearestFacade = 0.6;  // Nearer than this share of the typical depth is in front.
@@ -65,6 +71,70 @@ constexpr double kEndExtensionDistances = 8.0;
     return sum / static_cast<double>(count);
 }
 
+struct PlanPoint {
+    double along = 0.0;
+    double depth = 0.0;
+};
+
+// Seen from above, a facade is a straight line, and branches and parked cars aren't. So this
+// finds the line that most points lie on, and returns its depth level with the camera.
+[[nodiscard]] std::optional<double> depthOfBestLine(std::span<const PlanPoint> points,
+                                                    double tolerance, double minSpan,
+                                                    std::mt19937& random) {
+    if (points.size() < kMinLinePoints) {
+        return std::nullopt;
+    }
+    std::uniform_int_distribution<std::size_t> pick(0, points.size() - 1);
+    std::size_t bestCount = 0;
+    double bestSlope = 0.0;
+    double bestOffset = 0.0;
+    for (int attempt = 0; attempt < kLineAttempts; ++attempt) {
+        const PlanPoint first = points[pick(random)];
+        const PlanPoint second = points[pick(random)];
+        const double span = second.along - first.along;
+        if (std::abs(span) < minSpan) {
+            continue;
+        }
+        const double slope = (second.depth - first.depth) / span;
+        if (std::abs(slope) > kMaxLineSlope) {
+            continue;
+        }
+        const double offset = first.depth - slope * first.along;
+        const auto count = static_cast<std::size_t>(
+            std::count_if(points.begin(), points.end(), [&](const PlanPoint& point) {
+                return std::abs(point.depth - (offset + slope * point.along)) < tolerance;
+            }));
+        if (count > bestCount) {
+            bestCount = count;
+            bestSlope = slope;
+            bestOffset = offset;
+        }
+    }
+    if (bestCount < kMinLinePoints) {
+        return std::nullopt;
+    }
+    // A least-squares fit through the points on the line.
+    double sumA = 0.0;
+    double sumD = 0.0;
+    double sumAA = 0.0;
+    double sumAD = 0.0;
+    double used = 0.0;
+    for (const PlanPoint& point : points) {
+        if (std::abs(point.depth - (bestOffset + bestSlope * point.along)) < tolerance) {
+            sumA += point.along;
+            sumD += point.depth;
+            sumAA += point.along * point.along;
+            sumAD += point.along * point.depth;
+            used += 1.0;
+        }
+    }
+    const double divisor = used * sumAA - sumA * sumA;
+    if (divisor <= 0.0) {
+        return bestOffset;
+    }
+    return (sumD * sumAA - sumA * sumAD) / divisor;
+}
+
 // Gives cameras without a measurement a value between the nearest measurements on either side.
 [[nodiscard]] std::vector<double> withGapsFilled(std::span<const std::optional<double>> measured,
                                                  double fallback) {
@@ -101,6 +171,21 @@ constexpr double kEndExtensionDistances = 8.0;
     return result;
 }
 
+[[nodiscard]] std::vector<double> averaged(std::span<const double> values) {
+    std::vector<double> result;
+    result.reserve(values.size());
+    for (std::size_t index = 0; index < values.size(); ++index) {
+        const std::size_t first = index - std::min(index, kSmoothReach);
+        const std::size_t last = std::min(values.size() - 1, index + kSmoothReach);
+        double sum = 0.0;
+        for (std::size_t item = first; item <= last; ++item) {
+            sum += values[item];
+        }
+        result.push_back(sum / static_cast<double>(last - first + 1));
+    }
+    return result;
+}
+
 // Stops the wall from swinging sharply between neighbouring cameras, which would stretch it.
 void limitSlope(std::vector<double>& depths, std::span<const Vec3> path) {
     for (std::size_t index = 1; index < depths.size(); ++index) {
@@ -113,6 +198,41 @@ void limitSlope(std::vector<double>& depths, std::span<const Vec3> path) {
         depths[index - 1] =
             std::clamp(depths[index - 1], depths[index] - limit, depths[index] + limit);
     }
+}
+
+[[nodiscard]] FacadeSurface buildSurface(Vec3 up, std::span<const Vec3> path,
+                                         std::span<const Vec3> tangents,
+                                         std::span<const double> depths) {
+    FacadeSurface surface;
+    surface.up = up;
+    surface.medianCameraDistance = median(std::vector<double>(depths.begin(), depths.end()));
+    const double extension = surface.medianCameraDistance * kEndExtensionDistances;
+    const std::size_t count = path.size();
+    std::vector<Vec3> line;
+    line.reserve(count + 2);
+    line.push_back(path.front() + cross(up, tangents.front()) * depths.front() -
+                   tangents.front() * extension);
+    for (std::size_t index = 0; index < count; ++index) {
+        line.push_back(path[index] + cross(up, tangents[index]) * depths[index]);
+    }
+    line.push_back(path.back() + cross(up, tangents.back()) * depths.back() +
+                   tangents.back() * extension);
+
+    double arc = 0.0;
+    surface.samples.reserve(count);
+    for (std::size_t index = 0; index < line.size(); ++index) {
+        const double segment = index == 0 ? 0.0 : length(line[index] - line[index - 1]);
+        // Cameras at one spot would make a segment without a direction.
+        if (index == 0 || segment > 0.0) {
+            arc += segment;
+            surface.nodes.push_back(FacadeSurface::Node{line[index], arc});
+        }
+        if (index > 0 && index <= count) {
+            surface.samples.push_back(FacadeSurface::Sample{path[index - 1], tangents[index - 1],
+                                                            depths[index - 1], arc});
+        }
+    }
+    return surface;
 }
 
 }  // namespace
@@ -249,23 +369,28 @@ SurfaceResult fitFacadeSurface(std::span<const CameraPose> poses, std::span<cons
     const double typicalDepth = typical.value_or(middleDepth);
     const double window = steps.empty() ? typicalDepth / 2.0 : median(steps) * kWindowSteps;
 
+    // A fixed seed, so that the same camera positions always give the same panorama.
+    // NOLINTNEXTLINE(bugprone-random-generator-seed,cert-msc32-c,cert-msc51-cpp)
+    std::mt19937 random(20261105U);
+    const double usualStep = steps.empty() ? typicalDepth / 4.0 : median(steps);
     std::vector<std::optional<double>> measured;
     measured.reserve(count);
-    std::vector<double> nearby;
+    std::vector<PlanPoint> nearby;
     for (std::size_t index = 0; index < count; ++index) {
         nearby.clear();
         const Vec3 normal = cross(up, tangents[index]);
         for (const Vec3& point : points) {
             const double height = dot(point, up);
             const Vec3 offset = point - up * height - path[index];
-            if (height >= cameraHeights[index] &&
-                std::abs(dot(offset, tangents[index])) <= window) {
-                nearby.push_back(dot(offset, normal));
+            const double along = dot(offset, tangents[index]);
+            const double depth = dot(offset, normal);
+            if (height >= cameraHeights[index] && std::abs(along) <= window &&
+                depth >= typicalDepth * kNearestFacade && depth <= typicalDepth * kFurthestFacade) {
+                nearby.push_back(PlanPoint{along, depth});
             }
         }
-        measured.push_back(densestDepth(nearby, typicalDepth * kNearestFacade,
-                                        typicalDepth * kFurthestFacade, typicalDepth * kBinShare,
-                                        kMinLocalPoints));
+        measured.push_back(depthOfBestLine(nearby, typicalDepth * kLineTolerance,
+                                           usualStep * kMinLineSpanSteps, random));
     }
     if (std::none_of(measured.begin(), measured.end(),
                      [](const std::optional<double>& depth) { return depth.has_value(); })) {
@@ -274,33 +399,26 @@ SurfaceResult fitFacadeSurface(std::span<const CameraPose> poses, std::span<cons
     }
     std::vector<double> depths = medianFiltered(withGapsFilled(measured, typicalDepth));
     limitSlope(depths, path);
-
-    FacadeSurface surface;
-    surface.up = up;
-    surface.medianCameraDistance = median(depths);
-    const double extension = surface.medianCameraDistance * kEndExtensionDistances;
-    std::vector<Vec3> line;
-    line.reserve(count + 2);
-    line.push_back(path.front() + cross(up, tangents.front()) * depths.front() -
-                   tangents.front() * extension);
-    for (std::size_t index = 0; index < count; ++index) {
-        line.push_back(path[index] + cross(up, tangents[index]) * depths[index]);
-    }
-    line.push_back(path.back() + cross(up, tangents.back()) * depths.back() +
-                   tangents.back() * extension);
-
-    double arc = 0.0;
-    for (std::size_t index = 0; index < line.size(); ++index) {
-        const double segment = index == 0 ? 0.0 : length(line[index] - line[index - 1]);
-        // Cameras at one spot would make a segment without a direction.
-        if (index > 0 && segment <= 0.0) {
-            continue;
-        }
-        arc += segment;
-        surface.nodes.push_back(FacadeSurface::Node{line[index], arc});
-    }
-    result.surface = std::move(surface);
+    depths = averaged(depths);
+    result.surface = buildSurface(up, path, tangents, depths);
     return result;
+}
+
+FacadeSurface withDepthOffsets(const FacadeSurface& surface, std::span<const double> offsets) {
+    std::vector<Vec3> path;
+    std::vector<Vec3> tangents;
+    std::vector<double> depths;
+    path.reserve(surface.samples.size());
+    tangents.reserve(surface.samples.size());
+    depths.reserve(surface.samples.size());
+    for (std::size_t index = 0; index < surface.samples.size(); ++index) {
+        path.push_back(surface.samples[index].camera);
+        tangents.push_back(surface.samples[index].tangent);
+        depths.push_back(surface.samples[index].depth + offsets[index]);
+    }
+    std::vector<double> smoothed = medianFiltered(depths);
+    limitSlope(smoothed, path);
+    return buildSurface(surface.up, path, tangents, averaged(smoothed));
 }
 
 }  // namespace streetpano::core

@@ -13,6 +13,8 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Straighter facades: the wall is fitted as lines, and adjusted until neighbouring photos
+  agree at each seam
 - A facade surface that follows the buildings along the street and is laid out as a
   straight panorama, replacing the single facade plane
 - Camera positions on real streets: each result is checked as a walk, split where it

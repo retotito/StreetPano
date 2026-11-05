@@ -26,6 +26,25 @@ Build a vertical wall that follows the street:
 5. Lay the wall out flat: distance along it runs across the panorama, and height runs
    up it.
 
+## Update: straight facades and aligned seams
+
+Measuring one distance per camera let tree branches pull the wall closer, which made
+buildings zigzag. A rise in the wall's distance also shows up as a change of scale, so
+the error grew with height: lines near camera height stayed flat, while rooflines waved.
+
+- Seen from above a facade is a straight line, and branches aren't. So each camera now
+  fits a line through the points within 4 steps either way, with RANSAC.
+- Neighbouring photos agree only when the wall is at the right distance. So at each
+  seam, nearby distances are tried on the photos themselves, and the best one moves the
+  wall. Weak matches and answers at the edge of the search are ignored, because branches
+  caused jumps of up to 15% there.
+
+Lines alone straightened the bands but doubled a letter in 2 of 5 runs. With seam
+alignment, the letter was clean in all 5, and the seams on the facade had no sharp kinks.
+This is judged by eye. The mean match at seams stayed at about 0.78, so it doesn't confirm
+the improvement, partly because the branches at some seams never match well. A wall made
+10% too near still showed doubled letters, so this corrects small errors only.
+
 ## Results
 
 On 5 sets of camera positions for the same 27 real photos:
@@ -40,8 +59,8 @@ On 5 sets of camera positions for the same 27 real photos:
 ## Consequences
 
 - A straight panorama is now the default, because the wall is always laid out flat.
-- The wall's distances are plain data, one per camera. A later manual correction can
-  change them without redoing other work.
-- Rooflines still wave slightly near trees, where branches affect the measurement.
+- The wall's distances are plain data, one per camera (`FacadeSurface::samples`). A later
+  manual correction can change them through `withDepthOffsets` without redoing other work.
+- A gentle bow remains in some rooflines, and users can't correct it by hand yet.
 - Foreground objects are still cut at seams, and the road still isn't on the wall.
 - This has been measured on one real street, and on synthetic flat streets.

@@ -39,8 +39,8 @@ facade.
 
 On a real street of 27 phone photos, the facades and their lettering line up and the
 strip stays straight, with the same flaws on foreground objects. Dark patches also appear
-on the road, from parked car roofs close to the camera, and rooflines wave slightly near
-trees. Lens distortion isn't corrected yet.
+on the road, from parked car roofs close to the camera, and some rooflines keep a gentle
+bow. Lens distortion isn't corrected yet.
 
 ## Steps
 
@@ -101,9 +101,10 @@ See [Geometry correction](geometry-correction.md).
 
 ### 4. Build facade surface
 
-At each camera, measure the distance to the buildings from the 3D points above camera
-height, and join those distances into a smooth wall that follows the street. Laying
-that wall out flat gives the panorama's canvas. See the
+At each camera, fit a straight facade line through the nearby 3D points above camera
+height, and join those distances into a smooth wall that follows the street. Then adjust
+the wall at each seam until neighbouring photos agree. Laying that wall out flat gives the
+panorama's canvas. See the
 [decision record](../adr/0012-facade-surface.md).
 
 ### 5. Map foreground objects

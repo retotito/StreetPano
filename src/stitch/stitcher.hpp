@@ -12,10 +12,18 @@
 
 namespace streetpano::stitch {
 
+// How the wall was adjusted to make neighbouring photos agree.
+struct SeamAlignment {
+    int seams = 0;
+    int moved = 0;
+    double meanScoreBefore = 0.0;  // From -1 to 1.
+};
+
 struct StitchResult {
     QImage panorama;
     QString error;
     QStringList warnings;
+    SeamAlignment alignment;
     double scale = 1.0;
 };
 

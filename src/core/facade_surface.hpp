@@ -24,8 +24,18 @@ struct FacadeSurface {
         double arc = 0.0;
     };
 
+    // The measurement at one camera along the walk. These are plain data, so that a later step
+    // or a manual correction can change a distance and rebuild the wall.
+    struct Sample {
+        Vec3 camera;  // On the same plane as the nodes.
+        Vec3 tangent;
+        double depth = 0.0;
+        double arc = 0.0;
+    };
+
     Vec3 up;
     std::vector<Node> nodes;
+    std::vector<Sample> samples;
     double medianCameraDistance = 0.0;
 
     [[nodiscard]] Vec3 pointAt(double arc, double height) const;
@@ -44,5 +54,10 @@ struct SurfaceResult {
 // buildings are bridged from either side, which keeps the scale steady across them.
 [[nodiscard]] SurfaceResult fitFacadeSurface(std::span<const CameraPose> poses,
                                              std::span<const Vec3> points);
+
+// Returns the wall with each sample's depth moved by its offset, and smoothed again. There must
+// be one offset per sample.
+[[nodiscard]] FacadeSurface withDepthOffsets(const FacadeSurface& surface,
+                                             std::span<const double> offsets);
 
 }  // namespace streetpano::core

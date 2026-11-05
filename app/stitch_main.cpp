@@ -50,6 +50,8 @@ int run(int argc, char* argv[]) {
         err << "Couldn't write " << arguments.at(2) << Qt::endl;
         return 1;
     }
+    out << "Aligned the wall at " << result.alignment.moved << " of " << result.alignment.seams
+        << " seams" << Qt::endl;
     out << "Wrote " << result.panorama.width() << " x " << result.panorama.height() << " px at "
         << qRound(result.scale * 100.0) << "% of full detail to " << arguments.at(2) << Qt::endl;
     return 0;
