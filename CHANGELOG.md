@@ -13,6 +13,10 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Drawing another outline before choosing keeps the first as "Marked, no choice yet"
+- A new outline is listed in the Edits panel straight away, the area menu opens reliably on
+  macOS, and the toolbar has a Describe button. Backspace no longer deletes an edit, which
+  was too easy to do by accident
 - Mark with a rectangle or a line, as well as freehand. A line holds a description, such as
   "this should be exactly horizontal"
 - Marking stays on until Esc, so several objects can be outlined in a row, and on a trackpad

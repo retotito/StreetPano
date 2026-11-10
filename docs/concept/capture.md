@@ -105,7 +105,10 @@ overrule them while the panorama is showing:
    something that should be straight). A line can only be described, because it has no area
    to fill. Nothing changes yet. Marking stays on, so you can outline the next object
    straight away. Press ++esc++ to stop marking.
-2. A menu opens by itself. You can also right-click an outline at any time to open it.
+2. A menu opens by itself, and the outline appears in the **Edits** panel as a new area. You
+   can also right-click an outline or a row in the panel, or use the toolbar. If you draw the
+   next outline first, this one is kept as "Marked, no choice yet", so you can mark several
+   things and decide later.
 3. Choose what should happen:
 
 | Choice | What it does |
@@ -114,7 +117,7 @@ overrule them while the panorama is showing:
 | **Keep This Object Whole** | Takes all of the area from one photo |
 | **Try a Different Photo** | If the result isn't right, fills the area from another photo |
 | **Describe a Fix for the AI** | Saves your description with the area. The AI isn't built yet, so nothing changes for now |
-| **Cancel or Delete This Area** | Removes the outline, and your edit if you've made one |
+| **Cancel or Delete This Area** | Removes the outline, and your edit if you've made one. Undo brings it back |
 
 Finished edits show no outline, so the result looks clean. The **Edits** panel on the right
 lists every edit:

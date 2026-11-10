@@ -17,6 +17,7 @@
 #include <QShortcut>
 #include <QSplitter>
 #include <QStatusBar>
+#include <QTimer>
 #include <QToolBar>
 #include <algorithm>
 #include <cmath>
@@ -133,11 +134,13 @@ MainWindow::MainWindow(std::size_t previewBudgetBytes, QWidget* parent)
         tr("Saves your description with this area. No AI acts on it yet"));
     connect(describeFixAction_, &QAction::triggered, this, &MainWindow::askForFixDescription);
     deleteAreaAction_ = editMenu->addAction(tr("&Cancel or Delete This Area"));
-    deleteAreaAction_->setShortcut(QKeySequence(Qt::Key_Backspace));
     connect(deleteAreaAction_, &QAction::triggered, this, [this] { cancelOrDeleteArea(); });
     connect(view_, &PhotoView::lassoFinished, this, [this](const QPolygonF& outline) {
         beginArea(outline);
-        showAreaMenu(QCursor::pos());
+        // Opening a menu while the mouse button is still being released can close it again
+        // straight away on macOS, so it opens once that has finished.
+        const QPoint where = QCursor::pos();
+        QTimer::singleShot(0, this, [this, where] { showAreaMenu(where); });
     });
     connect(view_, &PhotoView::imageClicked, this, &MainWindow::selectAreaAt);
     connect(markAreaAction_, &QAction::toggled, this, [this](bool marking) {
@@ -174,6 +177,8 @@ MainWindow::MainWindow(std::size_t previewBudgetBytes, QWidget* parent)
     tools->addAction(removeObjectAction_);
     tools->addAction(keepObjectAction_);
     tools->addAction(nextAreaPhotoAction_);
+    describeFixAction_->setIconText(tr("Describe for the AI…"));
+    tools->addAction(describeFixAction_);
     tools->addSeparator();
     tools->addAction(undoAction_);
     tools->addAction(redoAction_);
@@ -224,7 +229,8 @@ MainWindow::MainWindow(std::size_t previewBudgetBytes, QWidget* parent)
     editsList_->setMinimumWidth(kPanelWidth);
     addDockWidget(Qt::RightDockWidgetArea, dock);
     connect(editsList_, &QListWidget::currentRowChanged, this, [this](int row) {
-        if (!refreshingList_) {
+        // The last row can be the new outline, which isn't an edit yet.
+        if (!refreshingList_ && row < areaCount()) {
             selectArea(row);
         }
     });
@@ -242,8 +248,10 @@ MainWindow::MainWindow(std::size_t previewBudgetBytes, QWidget* parent)
             });
     connect(editsList_, &QListWidget::customContextMenuRequested, this, [this](QPoint point) {
         const int row = editsList_->indexAt(point).row();
-        if (row >= 0) {
+        if (row >= 0 && row < areaCount()) {
             selectArea(row);
+        }
+        if (row >= 0) {
             showAreaMenu(editsList_->viewport()->mapToGlobal(point));
         }
     });
@@ -472,7 +480,9 @@ void MainWindow::redrawPanorama() {
 
 QString MainWindow::describeArea(const core::Patch& patch) const {
     QString text;
-    if (patch.outline.size() == 2) {
+    if (patch.kind == "marked" && patch.note.empty()) {
+        text = patch.outline.size() == 2 ? tr("Line, no choice yet") : tr("Marked, no choice yet");
+    } else if (patch.outline.size() == 2) {
         text = tr("Line");
     } else if (patch.kind == "remove") {
         text = tr("Remove");
@@ -507,7 +517,20 @@ void MainWindow::refreshEditsList() {
             item->setCheckState(patch.hidden ? Qt::Unchecked : Qt::Checked);
             item->setToolTip(item->text());
         }
-        editsList_->setCurrentRow(selectedArea_);
+        if (hasPendingArea()) {
+            auto* item = makeChild<QListWidgetItem>(
+                editsList_, tr("%1. New %2: choose what to do")
+                                .arg(decisions_.patches.size() + 1)
+                                .arg(pendingArea_.size() == 2 ? tr("line") : tr("area")));
+            item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+            QFont font = item->font();
+            font.setItalic(true);
+            item->setFont(font);
+            item->setToolTip(tr("Right-click for choices, or use the toolbar"));
+            editsList_->setCurrentRow(editsList_->count() - 1);
+        } else {
+            editsList_->setCurrentRow(selectedArea_);
+        }
     }
     refreshingList_ = false;
 }
@@ -628,6 +651,16 @@ bool MainWindow::hits(const QPolygonF& outline, QPointF point) const {
 void MainWindow::beginArea(const QPolygonF& outline) {
     if (!showingPanorama_ || panorama_.isNull() || outline.size() < 2) {
         return;
+    }
+    // A previous outline without a choice is kept, so drawing several first loses nothing.
+    if (hasPendingArea()) {
+        undoStack_.push_back(decisions_);
+        redoStack_.clear();
+        stitch::Decisions changed = decisions_;
+        changed.patches.push_back(
+            core::Patch{toWall(pendingArea_, stitched_.plan), {}, {}, "marked", false});
+        pendingArea_.clear();
+        applyDecisions(std::move(changed), -1);
     }
     pendingArea_ = outline;
     selectedArea_ = -1;

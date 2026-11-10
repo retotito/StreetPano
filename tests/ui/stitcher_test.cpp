@@ -68,6 +68,9 @@ class StitcherTest : public QObject {
     void severalAreasCanBeDescribedInARow();
     void escapeStopsMarkingThenCancels();
     void aLineCanOnlyBeDescribed();
+    void aNewOutlineIsListedStraightAway();
+    void noSingleKeyDeletesAnEdit();
+    void outlinesWithoutAChoiceAreKept();
     void choosingAShapeTurnsMarkingOn();
     void finishedEditsAreNotOutlined();
     void theEditsPanelListsEveryEdit();
@@ -685,7 +688,7 @@ void StitcherTest::theAreaMenuOffersTheChoices() {
     window.markAreaAction()->setChecked(true);
     emit view->lassoFinished(squareAt(window.panorama()));
     QVERIFY(window.hasPendingArea());
-    QVERIFY(window.areaMenu()->isVisible());
+    QTRY_VERIFY(window.areaMenu()->isVisible());  // Once the mouse release has finished.
     window.areaMenu()->hide();
 }
 
@@ -929,6 +932,79 @@ void StitcherTest::choosingAShapeTurnsMarkingOn() {
     window.selectPhoto(1);
     window.setMarkShape(streetpano::ui::PhotoView::MarkShape::Freehand);
     QVERIFY(!window.markAreaAction()->isChecked());  // Only on the panorama.
+}
+
+void StitcherTest::aNewOutlineIsListedStraightAway() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    QVERIFY(window.describeFix(QStringLiteral("not yet")) == false);
+    window.beginArea(squareAt(window.panorama()));
+    QCOMPARE(window.editsList()->count(), 1);
+    QVERIFY(window.editsList()->item(0)->text().contains(QStringLiteral("New area")));
+    QCOMPARE(window.editsList()->currentRow(), 0);
+    QVERIFY(window.hasPendingArea());  // Selecting its row keeps it.
+    QVERIFY(window.describeFix(QStringLiteral("first")));
+    QVERIFY(window.editsList()->item(0)->text().contains(QStringLiteral("first")));
+    const double y = window.panorama().height() / 2.0;
+    window.beginArea(QPolygonF{QPointF(20, y), QPointF(220, y)});
+    QCOMPARE(window.editsList()->count(), 2);
+    QVERIFY(window.editsList()->item(1)->text().contains(QStringLiteral("New line")));
+    // Right-clicking that row offers the choices, for the new outline.
+    emit window.editsList()->customContextMenuRequested(
+        window.editsList()->visualItemRect(window.editsList()->item(1)).center());
+    QVERIFY(window.hasPendingArea());
+    QTRY_VERIFY(window.areaMenu()->isVisible());
+    window.areaMenu()->hide();
+    QVERIFY(window.describeFix(QStringLiteral("second")));
+    QCOMPARE(window.areaCount(), 2);
+    QCOMPARE(window.editsList()->count(), 2);
+}
+
+void StitcherTest::noSingleKeyDeletesAnEdit() {
+    const Street street;
+    MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    QVERIFY(window.markArea(squareAt(window.panorama())));
+    window.editsList()->setFocus();
+    QTest::keyClick(&window, Qt::Key_Backspace);
+    QTest::keyClick(window.editsList(), Qt::Key_Backspace);
+    QTest::keyClick(window.editsList(), Qt::Key_Delete);
+    QCOMPARE(window.areaCount(), 1);
+}
+
+void StitcherTest::outlinesWithoutAChoiceAreKept() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    const QImage before = window.panorama();
+    window.beginArea(squareAt(before));
+    window.beginArea(squareAt(before, 20));
+    window.beginArea(squareAt(before, 10));
+    QCOMPARE(window.areaCount(), 2);  // And the newest is still waiting for a choice.
+    QVERIFY(window.hasPendingArea());
+    QVERIFY(window.editsList()->item(0)->text().contains(QStringLiteral("no choice yet")));
+    QCOMPARE(window.editsList()->count(), 3);
+    QCOMPARE(window.panorama(), before);  // Marking alone changes nothing.
+    const auto saved = readDecisions(window.decisionsPath());
+    QVERIFY(saved.decisions.has_value());
+    QCOMPARE(saved.decisions->patches[0].kind, std::string("marked"));
+    // A marked area can be described or removed later.
+    window.selectArea(0);
+    QVERIFY(window.describeFix(QStringLiteral("rebuild the entrance")));
+    QVERIFY(window.editsList()->item(0)->text().contains(QStringLiteral("rebuild the entrance")));
+    window.selectArea(1);
+    QVERIFY(window.removeObject());
+    QVERIFY(window.editsList()->item(1)->text().contains(QStringLiteral("Remove")));
+    QVERIFY(window.undo());
+    QVERIFY(window.undo());
+    QVERIFY(window.undo());
+    QCOMPARE(window.areaCount(), 1);
 }
 
 void StitcherTest::windowStitchesAndShowsThePanorama() {
