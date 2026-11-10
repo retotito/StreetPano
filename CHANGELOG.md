@@ -16,6 +16,9 @@ All notable changes are documented here. The format follows
 - Projects: create a project for a folder of photos and open recent ones. Photos are used where
   they are, never copied, and the project's own files go in a folder beside them
 - Steps along the top of the window: Projects, Photos, Align, Edit and Export
+- In Align, click a photo to select it, then turn, tilt, move or resize it in small steps, or
+  reset it. Corrections are saved per project and used when stitching. **Original Photos**
+  shows the photos as they were taken, to compare
 - Align shows every photo side by side at the same scale, with a faint grid and guide lines that
   can be added, dragged and removed. Guides are saved per project, and stitching now ends this
   step

@@ -14,7 +14,16 @@ recent one. The steps along the top take a street from photos to a finished pano
 **Projects**, **① Photos**, **② Align**, **③ Edit** and **④ Export**. In **② Align**, the
 photos are shown side by side. **Add Horizontal Guide** puts a line across all of them, which
 you can drag to a roofline or window line. Right-click a guide, or drag it off the photos, to
-remove it. **Stitch Panorama** is at the end of this step.
+remove it.
+
+Click a photo to select it, then fine-tune it with **Turn Left**, **Turn Right**, **Tilt Back**,
+**Tilt Forward**, **Up**, **Down**, **Smaller** and **Larger**. Each click is a small step. The
+arrow keys also work: ← and → select the previous or next photo, and ↑ and ↓ move it. **Reset
+Photo** undoes all corrections to it. **Original Photos** shows the photos as they were taken,
+to compare. It shows the middle of each photo, cut to the width of its place.
+
+Corrections are saved straight away in `alignment.json`, and never change your photos.
+**Stitch Panorama** is at the end of this step, and uses them.
 
 ## Stitch your photos
 

@@ -162,8 +162,56 @@ MainWindow::MainWindow(std::size_t previewBudgetBytes, QWidget* parent)
         alignView_->setGrid(
             shown && !alignmentView_.strip.isNull() ? alignmentView_.strip.height() / 12.0 : 0.0);
     });
+    showOriginalAction_ = alignTools_->addAction(tr("Original Photos"));
+    showOriginalAction_->setCheckable(true);
+    showOriginalAction_->setToolTip(tr("Show the photos as they were taken, to compare"));
+    connect(showOriginalAction_, &QAction::toggled, this, &MainWindow::setOriginalShown);
+    alignTools_->addSeparator();
+
+    // Controls for the selected photo. Each is one small step, so a few clicks fine-tune it.
+    constexpr double kTurnDegrees = 0.2;
+    constexpr double kMoveRows = 2.0;
+    constexpr double kSizeStep = 1.005;
+    const auto addControl = [this](const QString& name, const QString& tip, auto&& apply) {
+        QAction* action = alignTools_->addAction(name);
+        action->setToolTip(tip);
+        connect(action, &QAction::triggered, this, apply);
+        adjustActions_.push_back(action);
+    };
+    addControl(tr("Turn Left"), tr("Turn the selected photo anticlockwise"),
+               [this] { rotateSelected(kTurnDegrees); });
+    addControl(tr("Turn Right"), tr("Turn the selected photo clockwise"),
+               [this] { rotateSelected(-kTurnDegrees); });
+    addControl(tr("Tilt Back"), tr("Lean the selected photo's vertical lines back"),
+               [this] { tiltSelected(kTurnDegrees); });
+    addControl(tr("Tilt Forward"), tr("Lean the selected photo's vertical lines forward"),
+               [this] { tiltSelected(-kTurnDegrees); });
+    addControl(tr("Up"), tr("Move the selected photo up (or press the up arrow)"),
+               [this] { moveSelected(kMoveRows); });
+    addControl(tr("Down"), tr("Move the selected photo down (or press the down arrow)"),
+               [this] { moveSelected(-kMoveRows); });
+    addControl(tr("Smaller"), tr("Make the selected photo smaller"),
+               [this] { scaleSelected(1.0 / kSizeStep); });
+    addControl(tr("Larger"), tr("Make the selected photo larger"),
+               [this] { scaleSelected(kSizeStep); });
+    addControl(tr("Reset Photo"), tr("Undo all corrections to the selected photo"),
+               [this] { resetSelected(); });
     alignTools_->addSeparator();
     alignTools_->addAction(stitchAction);
+
+    // Clicking a photo selects it, and the arrow keys work while the view has the focus.
+    alignView_->setFocusPolicy(Qt::StrongFocus);
+    connect(alignView_, &PhotoView::imageClicked, this,
+            [this](QPointF point) { selectTile(stitch::tileAt(alignmentView_, point.x())); });
+    const auto addKey = [this](Qt::Key key, auto&& apply) {
+        auto* shortcut = makeChild<QShortcut>(alignView_, QKeySequence(key));
+        shortcut->setContext(Qt::WidgetShortcut);
+        connect(shortcut, &QShortcut::activated, this, apply);
+    };
+    addKey(Qt::Key_Right, [this] { selectTile(selectedTile_ + 1); });
+    addKey(Qt::Key_Left, [this] { selectTile(std::max(0, selectedTile_ - 1)); });
+    addKey(Qt::Key_Up, [this] { moveSelected(kMoveRows); });
+    addKey(Qt::Key_Down, [this] { moveSelected(-kMoveRows); });
     connect(alignView_, &PhotoView::guideMoved, this, &MainWindow::moveGuide);
     connect(alignView_, &PhotoView::imageRightClicked, this,
             [this](QPointF point, QPoint) { removeGuide(alignView_->guideAt(point)); });
@@ -333,10 +381,12 @@ MainWindow::MainWindow(std::size_t previewBudgetBytes, QWidget* parent)
     connect(savePanoramaAction_, &QAction::triggered, this, [this] { savePanoramaFile(); });
     updateEditActions();
 
-    auto* next = makeChild<QShortcut>(this, QKeySequence(Qt::Key_Right));
-    connect(next, &QShortcut::activated, this, [this] { selectPhoto(currentRow_ + 1); });
-    auto* previous = makeChild<QShortcut>(this, QKeySequence(Qt::Key_Left));
-    connect(previous, &QShortcut::activated, this, [this] { selectPhoto(currentRow_ - 1); });
+    // In Photos, the arrow keys move along the film strip. Align has its own.
+    nextShortcut_ = makeChild<QShortcut>(this, QKeySequence(Qt::Key_Right));
+    connect(nextShortcut_, &QShortcut::activated, this, [this] { selectPhoto(currentRow_ + 1); });
+    previousShortcut_ = makeChild<QShortcut>(this, QKeySequence(Qt::Key_Left));
+    connect(previousShortcut_, &QShortcut::activated, this,
+            [this] { selectPhoto(currentRow_ - 1); });
 
     view_->setMessage(tr("Open a folder of street photos to begin.\nFile > Open Folder"));
     refreshRecentProjects();
@@ -365,7 +415,9 @@ bool MainWindow::openFolder(const QString& folder) {
     // A new street needs its own side-by-side view.
     alignJob_.reset();
     alignmentView_ = stitch::AlignmentView{};
+    alignStreet_ = stitch::PreparedStreet{};
     alignment_ = stitch::Alignment{};
+    selectedTile_ = -1;
     alignmentPath_.clear();
     alignView_->setGuides({});
     alignView_->setGrid(0.0);
@@ -555,6 +607,11 @@ void MainWindow::applyStep(Step step) {
     // Each step shows only its own tools.
     strip_->setVisible(step == Step::Photos);
     alignTools_->setVisible(step == Step::Align);
+    updateAlignActions();
+    if (nextShortcut_ != nullptr) {
+        nextShortcut_->setEnabled(step == Step::Photos);
+        previousShortcut_->setEnabled(step == Step::Photos);
+    }
     editTools_->setVisible(step == Step::Edit);
     editsDock_->setVisible(step == Step::Edit);
     if (step != Step::Edit && markAreaAction_->isChecked()) {
@@ -608,22 +665,125 @@ void MainWindow::onAlignmentFinished() {
         return;
     }
     alignmentView_ = alignJob_->takeView();
+    alignStreet_ = alignJob_->takeStreet();
+    alignment_ = alignJob_->takeAlignment();
     alignJob_.reset();
+    selectedTile_ = -1;
     if (alignmentView_.strip.isNull()) {
         alignView_->setMessage(tr("The photos couldn't be prepared: %1").arg(alignmentView_.error));
         updateStatus();
         return;
     }
-    const stitch::AlignmentResult saved = stitch::readAlignment(alignmentPath_);
-    alignment_ = saved.alignment.value_or(stitch::Alignment{});
-    if (!saved.alignment.has_value()) {
-        editMessage_ = saved.error;
-    }
-    alignView_->setImage(alignmentView_.strip);
+    alignView_->setImage(originalShown_ ? alignmentView_.original : alignmentView_.strip);
     alignView_->fitHeight();
     alignView_->setGrid(showGridAction_->isChecked() ? alignmentView_.strip.height() / 12.0 : 0.0);
     showGuides();
+    showSelectedTile();
+    updateAlignActions();
     updateStatus();
+}
+
+void MainWindow::selectTile(int tile) {
+    if (alignmentView_.strip.isNull()) {
+        return;
+    }
+    selectedTile_ = tile >= 0 && tile < static_cast<int>(alignmentView_.tiles.size()) ? tile : -1;
+    showSelectedTile();
+    updateAlignActions();
+    updateStatus();
+}
+
+void MainWindow::showSelectedTile() {
+    if (selectedTile_ < 0) {
+        alignView_->setOutlines({}, -1);
+        return;
+    }
+    const stitch::AlignmentTile& tile =
+        alignmentView_.tiles[static_cast<std::size_t>(selectedTile_)];
+    const QRectF box(tile.left, 0, tile.width, alignmentView_.strip.height());
+    alignView_->setOutlines({QPolygonF(box)}, 0);
+}
+
+void MainWindow::updateAlignActions() {
+    for (QAction* action : adjustActions_) {
+        action->setEnabled(selectedTile_ >= 0);
+    }
+}
+
+core::PhotoAdjustment MainWindow::selectedAdjustment() const {
+    if (selectedTile_ < 0) {
+        return {};
+    }
+    return alignment_.adjustmentFor(
+        alignmentView_.tiles[static_cast<std::size_t>(selectedTile_)].photo);
+}
+
+bool MainWindow::adjustSelected(const core::PhotoAdjustment& change) {
+    if (selectedTile_ < 0) {
+        return false;
+    }
+    const std::string& photo = alignmentView_.tiles[static_cast<std::size_t>(selectedTile_)].photo;
+    core::PhotoAdjustment& adjustment = alignment_.photos[photo];
+    adjustment.rollDegrees += change.rollDegrees;
+    adjustment.pitchDegrees += change.pitchDegrees;
+    adjustment.shift += change.shift;
+    adjustment.scale *= change.scale;
+    if (adjustment.isNeutral()) {
+        alignment_.photos.erase(photo);
+    }
+    saveGuides();
+    stitch::redrawTile(alignmentView_, alignStreet_, QDir(currentFolder_),
+                       static_cast<std::size_t>(selectedTile_), alignment_.adjustmentFor(photo));
+    // Corrections are only visible in the corrected view.
+    if (originalShown_) {
+        showOriginalAction_->setChecked(false);
+    } else {
+        alignView_->setImage(alignmentView_.strip);
+    }
+    editMessage_ = panorama_.isNull() ? QString{} : tr("Stitch again to use your corrections.");
+    updateStatus();
+    return true;
+}
+
+bool MainWindow::rotateSelected(double degrees) {
+    return adjustSelected(core::PhotoAdjustment{degrees, 0.0, 0.0, 1.0});
+}
+
+bool MainWindow::tiltSelected(double degrees) {
+    return adjustSelected(core::PhotoAdjustment{0.0, degrees, 0.0, 1.0});
+}
+
+bool MainWindow::moveSelected(double rows) {
+    return adjustSelected(
+        core::PhotoAdjustment{0.0, 0.0, rows * alignmentView_.unitsPerPixel, 1.0});
+}
+
+bool MainWindow::scaleSelected(double factor) {
+    return adjustSelected(core::PhotoAdjustment{0.0, 0.0, 0.0, factor});
+}
+
+bool MainWindow::resetSelected() {
+    const core::PhotoAdjustment current = selectedAdjustment();
+    return adjustSelected(core::PhotoAdjustment{-current.rollDegrees, -current.pitchDegrees,
+                                                -current.shift, 1.0 / current.scale});
+}
+
+void MainWindow::setOriginalShown(bool shown) {
+    if (showOriginalAction_->isChecked() != shown) {
+        showOriginalAction_->setChecked(shown);  // Calls this again through the signal.
+        return;
+    }
+    originalShown_ = shown;
+    if (alignmentView_.strip.isNull()) {
+        return;
+    }
+    alignView_->setImage(shown ? alignmentView_.original : alignmentView_.strip);
+    // Guides mark heights on the wall, which only the corrected view shows.
+    if (shown) {
+        alignView_->setGuides({});
+    } else {
+        showGuides();
+    }
 }
 
 void MainWindow::showGuides() {
@@ -1447,6 +1607,19 @@ void MainWindow::updateStatus() {
         panoramaBytes += static_cast<double>(stitched_.base.sizeInBytes());
     }
     const double panorama = panoramaBytes / kBytesPerMegabyte;
+    if (step_ == Step::Align && selectedTile_ >= 0) {
+        const core::PhotoAdjustment adjustment = selectedAdjustment();
+        positionLabel_->setText(
+            tr("Photo %1 of %2: %3   |   turned %4\u00b0, tilted %5\u00b0, moved %6 px, %7% size")
+                .arg(selectedTile_ + 1)
+                .arg(alignmentView_.tiles.size())
+                .arg(QString::fromStdString(
+                    alignmentView_.tiles[static_cast<std::size_t>(selectedTile_)].photo))
+                .arg(adjustment.rollDegrees, 0, 'f', 1)
+                .arg(adjustment.pitchDegrees, 0, 'f', 1)
+                .arg(adjustment.shift / alignmentView_.unitsPerPixel, 0, 'f', 0)
+                .arg(adjustment.scale * 100.0, 0, 'f', 1));
+    }
     if (alignJob_ != nullptr) {
         positionLabel_->setText(
             alignJob_->total() > 0

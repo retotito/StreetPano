@@ -85,10 +85,10 @@ constexpr int kMatchingPhotoWidth = 1200;  // Enough to judge alignment, and qui
 
 StitchResult stitchPanorama(const PoseFile& poses, const QDir& photoFolder,
                             const core::StitchOptions& options, const StitchProgress& progress,
-                            const std::atomic<bool>* cancel) {
+                            const std::atomic<bool>* cancel, const Alignment* alignment) {
     StitchResult result;
 
-    PreparedStreet street = prepareStreet(poses, photoFolder, options);
+    PreparedStreet street = prepareStreet(poses, photoFolder, options, alignment);
     result.warnings = street.warnings;
     if (!street.error.isEmpty()) {
         result.error = street.error;

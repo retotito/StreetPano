@@ -9,6 +9,7 @@ add_executable(core_tests
     core/lru_cache_test.cpp
     core/photo_listing_test.cpp
     core/patch_test.cpp
+    core/photo_adjustment_test.cpp
     core/seam_match_test.cpp
     core/stitch_plan_test.cpp
     core/facade_surface_test.cpp)

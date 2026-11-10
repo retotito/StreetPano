@@ -28,10 +28,16 @@ void AlignJob::start() {
 }
 
 void AlignJob::run() {
+    // Built as locals and handed over under the lock, as with StitchJob.
     stitch::AlignmentView view;
+    stitch::PreparedStreet street;
+    stitch::Alignment alignment;
     const stitch::PoseFileResult poses = stitch::readPoseFile(posesPath_);
     if (poses.file.has_value()) {
-        const stitch::PreparedStreet street = stitch::prepareStreet(*poses.file, photoFolder_);
+        const stitch::AlignmentResult saved =
+            stitch::readAlignment(stitch::alignmentPathFor(posesPath_));
+        alignment = saved.alignment.value_or(stitch::Alignment{});
+        street = stitch::prepareStreet(*poses.file, photoFolder_, {}, &alignment);
         view = stitch::buildAlignmentView(
             street, photoFolder_, stripHeight_,
             [this](int done, int total) {
@@ -47,8 +53,20 @@ void AlignJob::run() {
     {
         const std::scoped_lock lock(mutex_);
         view_ = std::move(view);
+        street_ = std::move(street);
+        alignment_ = std::move(alignment);
     }
     emit workerFinished(QPrivateSignal{});
+}
+
+stitch::PreparedStreet AlignJob::takeStreet() {
+    const std::scoped_lock lock(mutex_);
+    return std::exchange(street_, stitch::PreparedStreet{});
+}
+
+stitch::Alignment AlignJob::takeAlignment() {
+    const std::scoped_lock lock(mutex_);
+    return std::exchange(alignment_, stitch::Alignment{});
 }
 
 stitch::AlignmentView AlignJob::takeView() {

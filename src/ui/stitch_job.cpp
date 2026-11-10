@@ -34,6 +34,10 @@ void StitchJob::run() {
     stitch::StitchResult result;
     const stitch::PoseFileResult poses = stitch::readPoseFile(posesPath_);
     if (poses.file.has_value()) {
+        // The user's corrections from aligning, if any.
+        const stitch::AlignmentResult alignment =
+            stitch::readAlignment(stitch::alignmentPathFor(posesPath_));
+        const stitch::Alignment corrections = alignment.alignment.value_or(stitch::Alignment{});
         result = stitch::stitchPanorama(
             *poses.file, photoFolder_, core::StitchOptions{},
             [this](int done, int total) {
@@ -41,7 +45,7 @@ void StitchJob::run() {
                 total_.store(total);
                 emit workerProgressed(QPrivateSignal{});
             },
-            &cancel_);
+            &cancel_, &corrections);
         if (!result.panorama.isNull()) {
             const stitch::DecisionsResult saved =
                 stitch::readDecisions(stitch::decisionsPathFor(posesPath_));

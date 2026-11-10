@@ -15,6 +15,7 @@
 #include "core/facade_surface.hpp"
 #include "core/patch.hpp"
 #include "core/stitch_plan.hpp"
+#include "stitch/alignment.hpp"
 #include "stitch/pose_file.hpp"
 
 namespace streetpano::stitch {
@@ -51,7 +52,8 @@ using StitchProgress = std::function<void(int done, int total)>;
 [[nodiscard]] StitchResult stitchPanorama(const PoseFile& poses, const QDir& photoFolder,
                                           const core::StitchOptions& options = {},
                                           const StitchProgress& progress = {},
-                                          const std::atomic<bool>* cancel = nullptr);
+                                          const std::atomic<bool>* cancel = nullptr,
+                                          const Alignment* alignment = nullptr);
 
 // Returns base with these patches drawn on it in order, reading each photo from its original
 // file. A patch whose photo can't be used is skipped, with a warning.

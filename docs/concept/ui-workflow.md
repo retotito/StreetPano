@@ -15,7 +15,7 @@ earlier step.
 |---|---|
 | **Projects** | Create a project for a folder of photos, or open a recent one. Photos are used where they are and never copied |
 | **① Photos** | Check the photos |
-| **② Align** | All photos side by side at the same scale, with a grid and guide lines. Adjusting photos by hand, and the rest automatically, comes next. **Stitch Panorama** ends this step |
+| **② Align** | All photos side by side at the same scale, with a grid and guide lines. Select a photo and turn, tilt, move or resize it, or compare with the original photos. Aligning the photos in between automatically comes next. **Stitch Panorama** ends this step |
 | **③ Edit** | Mark areas, remove or keep objects, describe fixes, and the edits panel |
 | **④ Export** | Save the panorama with its edits, as JPEG, PNG or TIFF |
 

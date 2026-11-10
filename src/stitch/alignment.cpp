@@ -24,10 +24,64 @@ constexpr QRgb kGapColour = qRgb(32, 34, 37);
     return folder.filePath(QString::fromStdString(pose.name));
 }
 
+// Reads a photo at about the size it's shown, and projects it into its tile.
+void drawTile(AlignmentView& view, const PreparedStreet& street, const QDir& photoFolder,
+              const AlignmentTile& tile, const core::CameraPose& pose) {
+    const double fullUnitsPerPixel = street.surface.medianCameraDistance / street.focalPixels;
+    const double shrink = std::min(1.0, kSharpness * fullUnitsPerPixel / view.plan.unitsPerPixel);
+    const QSize readSize(std::max(2, static_cast<int>(street.photoSize.width() * shrink)),
+                         std::max(2, static_cast<int>(street.photoSize.height() * shrink)));
+    const double focal =
+        street.focalPixels * readSize.width() / static_cast<double>(street.photoSize.width());
+    QPainter painter(&view.strip);
+    painter.fillRect(tile.left, 0, tile.width, view.strip.height(), kGapColour);
+    QImageReader reader(photoPath(photoFolder, pose));
+    reader.setAutoTransform(false);
+    reader.setScaledSize(readSize);
+    QImage photo = reader.read();
+    if (photo.isNull()) {
+        view.warnings.append(QStringLiteral("Skipped %1: %2")
+                                 .arg(QString::fromStdString(pose.name), reader.errorString()));
+        return;
+    }
+    photo.convertTo(QImage::Format_ARGB32);
+    const QImage& source = photo;
+    const core::ImageView sourceView{reinterpret_cast<const std::uint32_t*>(source.constBits()),
+                                     source.width(), source.height(),
+                                     static_cast<std::size_t>(source.bytesPerLine())};
+    const std::vector<std::uint32_t> pixels =
+        core::projectPhoto(street.surface, view.plan, pose, focal, sourceView, tile.column,
+                           tile.column + tile.width, 0, view.strip.height());
+    const QImage projected(reinterpret_cast<const uchar*>(pixels.data()), tile.width,
+                           view.strip.height(), static_cast<qsizetype>(tile.width) * 4,
+                           QImage::Format_ARGB32);
+    painter.drawImage(tile.left, 0, projected);
+}
+
+// Draws a photo as it was taken, scaled to the strip's height and centred in its tile.
+void drawOriginal(AlignmentView& view, const QDir& photoFolder, const AlignmentTile& tile) {
+    QImageReader reader(photoFolder.filePath(QString::fromStdString(tile.photo)));
+    reader.setAutoTransform(true);
+    const QSize size = reader.size();
+    if (!size.isValid()) {
+        return;
+    }
+    // The size before turning; a photo held upright is reported on its side.
+    const bool turned = reader.transformation().testFlag(QImageIOHandler::TransformationRotate90);
+    const QSize upright = turned ? size.transposed() : size;
+    const int height = view.original.height();
+    const int width = std::max(1, upright.width() * height / std::max(1, upright.height()));
+    reader.setScaledSize(turned ? QSize(height, width) : QSize(width, height));
+    const QImage photo = reader.read();
+    QPainter painter(&view.original);
+    painter.setClipRect(tile.left, 0, tile.width, height);
+    painter.drawImage(tile.left + (tile.width - photo.width()) / 2, 0, photo);
+}
+
 }  // namespace
 
 PreparedStreet prepareStreet(const PoseFile& poses, const QDir& photoFolder,
-                             const core::StitchOptions& options) {
+                             const core::StitchOptions& options, const Alignment* alignment) {
     PreparedStreet street;
     street.focalPixels = poses.focalPixels;
     // Unreadable photos are left out of the plan, so that their neighbours fill the gap.
@@ -60,6 +114,12 @@ PreparedStreet prepareStreet(const PoseFile& poses, const QDir& photoFolder,
         return street;
     }
     street.surface = *surface.surface;
+    street.originalPoses = street.poses;
+    if (alignment != nullptr) {
+        for (core::CameraPose& pose : street.poses) {
+            pose = core::adjustedPose(pose, alignment->adjustmentFor(pose.name), street.surface);
+        }
+    }
     const core::PlanResult plan =
         core::makeStitchPlan(street.surface, street.poses, poses.focalPixels,
                              street.photoSize.width(), street.photoSize.height(), options);
@@ -84,84 +144,73 @@ AlignmentView buildAlignmentView(const PreparedStreet& street, const QDir& photo
     core::StitchPlan small = street.plan;
     small.unitsPerPixel = street.plan.unitsPerPixel * street.plan.height / stripHeight;
     small.height = stripHeight;
+    view.plan = small;
     view.unitsPerPixel = small.unitsPerPixel;
     view.topHeight = small.topHeight;
 
-    struct Placed {
-        std::size_t camera;
-        core::PixelBox box;
-    };
-    std::vector<Placed> placed;
+    // Tiles are laid out from the original positions, so a correction never moves its slot.
     int width = 0;
-    for (std::size_t index = 0; index < street.poses.size(); ++index) {
+    for (std::size_t index = 0; index < street.originalPoses.size(); ++index) {
         const auto box =
-            core::photoBox(street.surface, small, street.poses[index], street.focalPixels,
+            core::photoBox(street.surface, small, street.originalPoses[index], street.focalPixels,
                            street.photoSize.width(), street.photoSize.height());
         if (!box.has_value()) {
             view.warnings.append(QStringLiteral("%1 doesn't look at the facade.")
                                      .arg(QString::fromStdString(street.poses[index].name)));
             continue;
         }
-        placed.push_back(Placed{index, *box});
-        width += (box->right - box->left) + kGapPixels;
+        const int tileWidth = box->right - box->left;
+        view.tiles.push_back(
+            AlignmentTile{street.poses[index].name, index, width, tileWidth, box->left});
+        width += tileWidth + kGapPixels;
     }
-    if (placed.empty()) {
+    if (view.tiles.empty()) {
         view.error = QStringLiteral("No photo looks at the facade.");
         return view;
     }
     view.strip = QImage(width, stripHeight, QImage::Format_ARGB32);
-    if (view.strip.isNull()) {
+    view.original = QImage(width, stripHeight, QImage::Format_ARGB32);
+    if (view.strip.isNull() || view.original.isNull()) {
         view.error = QStringLiteral("There isn't enough memory for the side-by-side view.");
         return view;
     }
     view.strip.fill(kGapColour);
+    view.original.fill(kGapColour);
 
-    // Photos are read at about the size they're shown.
-    const double fullUnitsPerPixel = street.surface.medianCameraDistance / street.focalPixels;
-    const double shrink = std::min(1.0, kSharpness * fullUnitsPerPixel / small.unitsPerPixel);
-    const QSize readSize(std::max(2, static_cast<int>(street.photoSize.width() * shrink)),
-                         std::max(2, static_cast<int>(street.photoSize.height() * shrink)));
-    const double focal =
-        street.focalPixels * readSize.width() / static_cast<double>(street.photoSize.width());
-
-    int left = 0;
     int done = 0;
-    QPainter painter(&view.strip);
-    for (const Placed& item : placed) {
+    for (const AlignmentTile& tile : view.tiles) {
         if (cancel != nullptr && cancel->load()) {
             view.error = QStringLiteral("Cancelled.");
             return view;
         }
-        const core::CameraPose& pose = street.poses[item.camera];
-        const int tileWidth = item.box.right - item.box.left;
-        QImageReader reader(photoPath(photoFolder, pose));
-        reader.setAutoTransform(false);
-        reader.setScaledSize(readSize);
-        QImage photo = reader.read();
-        if (!photo.isNull()) {
-            photo.convertTo(QImage::Format_ARGB32);
-            const QImage& source = photo;
-            const core::ImageView sourceView{
-                reinterpret_cast<const std::uint32_t*>(source.constBits()), source.width(),
-                source.height(), static_cast<std::size_t>(source.bytesPerLine())};
-            const std::vector<std::uint32_t> pixels =
-                core::projectPhoto(street.surface, small, pose, focal, sourceView, item.box.left,
-                                   item.box.right, 0, stripHeight);
-            const QImage tile(reinterpret_cast<const uchar*>(pixels.data()), tileWidth, stripHeight,
-                              static_cast<qsizetype>(tileWidth) * 4, QImage::Format_ARGB32);
-            painter.drawImage(left, 0, tile);
-        } else {
-            view.warnings.append(QStringLiteral("Skipped %1: %2")
-                                     .arg(QString::fromStdString(pose.name), reader.errorString()));
-        }
-        view.tiles.push_back(AlignmentTile{pose.name, left, tileWidth});
-        left += tileWidth + kGapPixels;
+        drawTile(view, street, photoFolder, tile, street.poses[tile.camera]);
+        drawOriginal(view, photoFolder, tile);
         ++done;
         if (progress) {
-            progress(done, static_cast<int>(placed.size()));
+            progress(done, static_cast<int>(view.tiles.size()));
         }
     }
     return view;
+}
+
+void redrawTile(AlignmentView& view, const PreparedStreet& street, const QDir& photoFolder,
+                std::size_t tile, const core::PhotoAdjustment& adjustment) {
+    if (tile >= view.tiles.size() || view.strip.isNull()) {
+        return;
+    }
+    const AlignmentTile& placed = view.tiles[tile];
+    drawTile(view, street, photoFolder, placed,
+             core::adjustedPose(street.originalPoses[placed.camera], adjustment, street.surface));
+}
+
+int tileAt(const AlignmentView& view, double column) {
+    for (std::size_t index = 0; index < view.tiles.size(); ++index) {
+        const AlignmentTile& tile = view.tiles[index];
+        if (column >= tile.left && column < tile.left + tile.width) {
+            return static_cast<int>(index);
+        }
+    }
+    return -1;
 }
 
 QString alignmentPathFor(const QString& posesPath) {
@@ -197,6 +246,24 @@ AlignmentResult readAlignment(const QString& path) {
         }
         alignment.guides.push_back(guide.toDouble());
     }
+    const QJsonObject photos = root.value(QStringLiteral("photos")).toObject();
+    for (auto entry = photos.begin(); entry != photos.end(); ++entry) {
+        const QJsonObject values = entry.value().toObject();
+        core::PhotoAdjustment adjustment;
+        adjustment.rollDegrees = values.value(QStringLiteral("roll_degrees")).toDouble(0.0);
+        adjustment.pitchDegrees = values.value(QStringLiteral("pitch_degrees")).toDouble(0.0);
+        adjustment.shift = values.value(QStringLiteral("shift")).toDouble(0.0);
+        adjustment.scale = values.value(QStringLiteral("scale")).toDouble(1.0);
+        constexpr double kMaxRotation = 45.0;
+        if (!std::isfinite(adjustment.rollDegrees) || !std::isfinite(adjustment.pitchDegrees) ||
+            !std::isfinite(adjustment.shift) || !std::isfinite(adjustment.scale) ||
+            adjustment.scale <= 0.0 || std::abs(adjustment.rollDegrees) > kMaxRotation ||
+            std::abs(adjustment.pitchDegrees) > kMaxRotation || entry.key().contains(u'/')) {
+            result.error = QStringLiteral("%1 isn't a valid alignment.").arg(path);
+            return result;
+        }
+        alignment.photos[entry.key().toStdString()] = adjustment;
+    }
     result.alignment = alignment;
     return result;
 }
@@ -206,8 +273,19 @@ bool writeAlignment(const Alignment& alignment, const QString& path) {
     for (const double guide : alignment.guides) {
         guides.append(guide);
     }
+    QJsonObject photos;
+    for (const auto& [photo, adjustment] : alignment.photos) {
+        if (!adjustment.isNeutral()) {
+            photos.insert(QString::fromStdString(photo),
+                          QJsonObject{{QStringLiteral("roll_degrees"), adjustment.rollDegrees},
+                                      {QStringLiteral("pitch_degrees"), adjustment.pitchDegrees},
+                                      {QStringLiteral("shift"), adjustment.shift},
+                                      {QStringLiteral("scale"), adjustment.scale}});
+        }
+    }
     const QJsonObject root{{QStringLiteral("format_version"), kFormatVersion},
-                           {QStringLiteral("guides"), guides}};
+                           {QStringLiteral("guides"), guides},
+                           {QStringLiteral("photos"), photos}};
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly)) {
         return false;
