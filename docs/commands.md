@@ -2,6 +2,17 @@
 
 Run these in the Terminal app. Each block starts by going to the project folder.
 
+## Open the app
+
+```sh
+cd ~/projects/StreetPano
+./scripts/dev.sh ~/Downloads/Photos-1-001-jpeg
+```
+
+The app opens on **Projects**, where you can create a project for a folder of photos or open a
+recent one. The steps along the top take a street from photos to a finished panorama:
+**Projects**, **① Photos**, **② Align** (coming next), **③ Edit** and **④ Export**.
+
 ## Stitch your photos
 
 ```sh

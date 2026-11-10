@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QAction>
+#include <QDockWidget>
 #include <QImage>
 #include <QLabel>
 #include <QListView>
@@ -10,14 +11,18 @@
 #include <QPoint>
 #include <QPointF>
 #include <QPolygonF>
+#include <QStackedWidget>
 #include <QString>
+#include <QToolBar>
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "core/lru_cache.hpp"
 #include "stitch/decisions.hpp"
+#include "stitch/project.hpp"
 #include "stitch/stitcher.hpp"
 #include "ui/image_loader.hpp"
 #include "ui/photo_list_model.hpp"
@@ -31,10 +36,30 @@ class MainWindow : public QMainWindow {
     Q_OBJECT
 
   public:
+    // The steps along the top, in the order a street goes through them.
+    enum class Step { Projects, Photos, Align, Edit, Export };
+
     static constexpr std::size_t kDefaultPreviewBudgetBytes = std::size_t{256} * 1024 * 1024;
 
     explicit MainWindow(std::size_t previewBudgetBytes = kDefaultPreviewBudgetBytes,
                         QWidget* parent = nullptr);
+
+    // Projects. Photos are used where they are, and the project's own files go beside them.
+    // An empty name uses the folder's name. Each returns false, and shows why, on failure.
+    bool createProject(const QString& name, const QString& photoFolder);
+    bool openProject(const QString& projectFile);
+    bool openProjectForFolder(const QString& photoFolder);
+    [[nodiscard]] const std::optional<stitch::Project>& project() const { return project_; }
+    [[nodiscard]] QListWidget* recentProjectsList() const { return recentList_; }
+    [[nodiscard]] QString projectsMessage() const { return projectsMessage_->text(); }
+
+    // Steps. A step that can't be used yet, such as Edit before stitching, is ignored.
+    void setStep(Step step);
+    [[nodiscard]] Step step() const { return step_; }
+    [[nodiscard]] QAction* stepAction(Step step) const;
+
+    // Saves the panorama with its edits. The format follows the file's extension.
+    bool savePanoramaAs(const QString& path);
 
     // Returns false, and shows the reason, if the folder can't be used.
     bool openFolder(const QString& folder);
@@ -105,6 +130,16 @@ class MainWindow : public QMainWindow {
 
   private:
     void chooseFolder();
+    void chooseNewProject();
+    void chooseProject();
+    void chooseSaveAs();
+    void refreshRecentProjects();
+    void applyStep(Step step);
+    void updateStepActions();
+    void displayPanorama();
+    [[nodiscard]] bool isStepAvailable(Step step) const;
+    [[nodiscard]] QWidget* createProjectsPage();
+    [[nodiscard]] QWidget* createExportPage();
     void showPhoto(int row);
     void requestPreview(int row);
     void createPreviewLoader();
@@ -151,6 +186,20 @@ class MainWindow : public QMainWindow {
     QString editMessage_;
     int selectedArea_ = -1;
     bool showingPanorama_ = false;
+    Step step_ = Step::Projects;
+    std::optional<stitch::Project> project_;
+    QStackedWidget* pages_ = nullptr;
+    QWidget* workPage_ = nullptr;
+    QWidget* projectsPage_ = nullptr;
+    QWidget* alignPage_ = nullptr;
+    QWidget* exportPage_ = nullptr;
+    QListWidget* recentList_ = nullptr;
+    QLabel* projectsMessage_ = nullptr;
+    QLabel* exportInfo_ = nullptr;
+    std::vector<QAction*> stepActions_;
+    QToolBar* photosTools_ = nullptr;
+    QToolBar* editTools_ = nullptr;
+    QDockWidget* editsDock_ = nullptr;
     QPolygonF pendingArea_;
     QMenu* areaMenu_ = nullptr;
     QListWidget* editsList_ = nullptr;

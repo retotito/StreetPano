@@ -13,6 +13,9 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Projects: create a project for a folder of photos and open recent ones. Photos are used where
+  they are, never copied, and the project's own files go in a folder beside them
+- Steps along the top of the window: Projects, Photos, Align (coming next), Edit and Export
 - Drawing another outline before choosing keeps the first as "Marked, no choice yet"
 - A new outline is listed in the Edits panel straight away, the area menu opens reliably on
   macOS, and the toolbar has a Describe button. Backspace no longer deletes an edit, which

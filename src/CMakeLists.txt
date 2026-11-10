@@ -21,6 +21,8 @@ add_library(streetpano_stitch STATIC
     stitch/decisions.hpp
     stitch/pose_file.cpp
     stitch/pose_file.hpp
+    stitch/project.cpp
+    stitch/project.hpp
     stitch/stitcher.cpp
     stitch/stitcher.hpp)
 target_link_libraries(streetpano_stitch PUBLIC streetpano_core Qt6::Gui)
@@ -37,6 +39,8 @@ add_library(streetpano_ui STATIC
     ui/photo_view.cpp
     ui/photo_view.hpp
     ui/qt_ownership.hpp
+    ui/recent_projects.cpp
+    ui/recent_projects.hpp
     ui/stitch_job.cpp
     ui/stitch_job.hpp)
 target_link_libraries(streetpano_ui PUBLIC streetpano_stitch Qt6::Widgets)

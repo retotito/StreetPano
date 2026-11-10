@@ -6,6 +6,7 @@
 #include <QMenu>
 #include <QPolygonF>
 #include <QSignalSpy>
+#include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QtTest>
 #include <atomic>
@@ -46,6 +47,13 @@ class EditingTest : public QObject {
     Q_OBJECT
 
   private slots:
+    void initTestCase();
+    void startsOnTheProjectsStep();
+    void stepsBecomeAvailableAsTheStreetProgresses();
+    void eachStepShowsOnlyItsOwnTools();
+    void aProjectIsCreatedOpenedAndRemembered();
+    void aProjectWhosePhotosAreGoneIsReported();
+    void exportSavesThePanoramaWithItsEdits();
     void markingAnAreaSavesADecision();
     void editsCanBeUndoneAndRedone();
     void changingAPhotoStepsThroughTheChoices();
@@ -671,6 +679,114 @@ void EditingTest::thePanelIsEmptyAwayFromThePanorama() {
     QCOMPARE(window.selectedArea(), -1);
     window.showPanorama();
     QCOMPARE(window.editsList()->count(), 1);
+}
+
+void EditingTest::initTestCase() { QStandardPaths::setTestModeEnabled(true); }
+
+void EditingTest::startsOnTheProjectsStep() {
+    MainWindow window;
+    QVERIFY(window.step() == MainWindow::Step::Projects);
+    QVERIFY(window.stepAction(MainWindow::Step::Projects)->isChecked());
+    for (const auto step : {MainWindow::Step::Photos, MainWindow::Step::Align,
+                            MainWindow::Step::Edit, MainWindow::Step::Export}) {
+        QVERIFY(!window.stepAction(step)->isEnabled());
+        window.setStep(step);  // Not available yet, so nothing happens.
+        QVERIFY(window.step() == MainWindow::Step::Projects);
+    }
+}
+
+void EditingTest::stepsBecomeAvailableAsTheStreetProgresses() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(window.openFolder(street.folder.path()));
+    QVERIFY(window.step() == MainWindow::Step::Photos);
+    QVERIFY(window.stepAction(MainWindow::Step::Align)->isEnabled());
+    QVERIFY(!window.stepAction(MainWindow::Step::Edit)->isEnabled());
+    QVERIFY(window.startStitch(street.posesPath));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    QVERIFY(window.step() == MainWindow::Step::Edit);
+    QVERIFY(!window.positionText().contains(QStringLiteral("Photo 1 of")));
+    QVERIFY(window.stepAction(MainWindow::Step::Export)->isEnabled());
+    window.setStep(MainWindow::Step::Photos);
+    QVERIFY(!window.isShowingPanorama());
+    QVERIFY(window.stepAction(MainWindow::Step::Photos)->isChecked());
+    window.setStep(MainWindow::Step::Align);
+    QVERIFY(window.step() == MainWindow::Step::Align);
+    window.setStep(MainWindow::Step::Edit);
+    QVERIFY(window.isShowingPanorama());
+    window.setStep(MainWindow::Step::Projects);
+    QVERIFY(window.step() == MainWindow::Step::Projects);
+    window.showPanorama();
+    QVERIFY(window.step() == MainWindow::Step::Edit);
+}
+
+void EditingTest::eachStepShowsOnlyItsOwnTools() {
+    const Street street;
+    MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    window.markAreaAction()->setChecked(true);
+    window.setStep(MainWindow::Step::Photos);
+    QVERIFY(window.filmStrip()->isVisible());
+    QVERIFY(!window.markAreaAction()->isChecked());  // Marking is only for the panorama.
+    QVERIFY(!window.editsList()->isVisible());
+    window.setStep(MainWindow::Step::Edit);
+    QVERIFY(!window.filmStrip()->isVisible());
+    QVERIFY(window.editsList()->isVisible());
+}
+
+void EditingTest::aProjectIsCreatedOpenedAndRemembered() {
+    const Street street;
+    {
+        MainWindow window;
+        QVERIFY(window.createProject(QStringLiteral("Test Street"), street.folder.path()));
+        QVERIFY(window.project().has_value());
+        QCOMPARE(window.project()->name, QStringLiteral("Test Street"));
+        QVERIFY(window.windowTitle().startsWith(QStringLiteral("Test Street")));
+        QVERIFY(window.step() == MainWindow::Step::Photos);
+        QCOMPARE(window.photoCount(), kPhotos);
+    }
+    MainWindow window;
+    QVERIFY(window.recentProjectsList()->count() >= 1);
+    const QString first = window.recentProjectsList()->item(0)->text();
+    QVERIFY(first.startsWith(QStringLiteral("Test Street")));
+    emit window.recentProjectsList()->itemActivated(window.recentProjectsList()->item(0));
+    QCOMPARE(window.project()->name, QStringLiteral("Test Street"));
+    // Opening by folder finds the same project.
+    MainWindow again;
+    QVERIFY(again.openProjectForFolder(street.folder.path()));
+    QCOMPARE(again.project()->name, QStringLiteral("Test Street"));
+    QVERIFY(QDir(street.folder.path() + QStringLiteral(".streetpano")).removeRecursively());
+}
+
+void EditingTest::aProjectWhosePhotosAreGoneIsReported() {
+    MainWindow window;
+    QVERIFY(!window.createProject(QStringLiteral("x"), QStringLiteral("/no/such/folder")));
+    QVERIFY(window.projectsMessage().contains(QStringLiteral("isn't a folder")));
+    QVERIFY(!window.openProject(QStringLiteral("/no/such/project.json")));
+    QTemporaryDir root;
+    const QString photos = QDir(root.path()).filePath(QStringLiteral("empty"));
+    QVERIFY(QDir().mkpath(photos));
+    QVERIFY(!window.createProject(QStringLiteral("Empty"), photos));
+    QVERIFY(window.projectsMessage().contains(QStringLiteral("aren't in")));
+    QVERIFY(QDir(photos + QStringLiteral(".streetpano")).removeRecursively());
+}
+
+void EditingTest::exportSavesThePanoramaWithItsEdits() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(!window.savePanoramaAs(QStringLiteral("/tmp/none.jpg")));  // Nothing yet.
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    QVERIFY(window.markArea(squareAt(window.panorama())));
+    window.setStep(MainWindow::Step::Export);
+    QVERIFY(window.step() == MainWindow::Step::Export);
+    const QString path = street.folder.filePath(QStringLiteral("export.png"));
+    QVERIFY(window.savePanoramaAs(path));
+    QCOMPARE(QImage(path).size(), window.panorama().size());
+    QVERIFY(!window.savePanoramaAs(street.folder.filePath(QStringLiteral("no/such/x.jpg"))));
 }
 
 QTEST_MAIN(EditingTest)
