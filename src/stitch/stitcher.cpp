@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "core/seam_match.hpp"
+#include "stitch/alignment.hpp"
 
 namespace streetpano::stitch {
 namespace {
@@ -87,45 +88,17 @@ StitchResult stitchPanorama(const PoseFile& poses, const QDir& photoFolder,
                             const std::atomic<bool>* cancel) {
     StitchResult result;
 
-    // Unreadable photos are left out of the plan, so that their neighbours fill the gap.
-    std::vector<core::CameraPose> usable;
-    usable.reserve(poses.poses.size());
-    QSize photoSize;
-    for (const core::CameraPose& pose : poses.poses) {
-        QImageReader reader(photoPath(photoFolder, pose));
-        reader.setAutoTransform(false);
-        const QSize size = reader.size();
-        if (!size.isValid()) {
-            result.warnings.append(
-                QStringLiteral("Skipped %1: %2")
-                    .arg(QString::fromStdString(pose.name), reader.errorString()));
-            continue;
-        }
-        if (photoSize.isValid() && size != photoSize) {
-            result.warnings.append(QStringLiteral("Skipped %1: it has a different size.")
-                                       .arg(QString::fromStdString(pose.name)));
-            continue;
-        }
-        photoSize = size;
-        usable.push_back(pose);
-    }
-    if (usable.empty()) {
-        result.error = QStringLiteral("None of the photos could be read.");
+    PreparedStreet street = prepareStreet(poses, photoFolder, options);
+    result.warnings = street.warnings;
+    if (!street.error.isEmpty()) {
+        result.error = street.error;
         return result;
     }
-
-    const core::SurfaceResult surfaceResult = core::fitFacadeSurface(usable, poses.points);
-    if (!surfaceResult.surface.has_value()) {
-        result.error = QString::fromStdString(surfaceResult.error);
-        return result;
-    }
-    core::FacadeSurface surface = *surfaceResult.surface;
-    core::PlanResult planResult = core::makeStitchPlan(
-        surface, usable, poses.focalPixels, photoSize.width(), photoSize.height(), options);
-    if (!planResult.plan.has_value()) {
-        result.error = QString::fromStdString(planResult.error);
-        return result;
-    }
+    std::vector<core::CameraPose>& usable = street.poses;
+    const QSize photoSize = street.photoSize;
+    core::FacadeSurface surface = street.surface;
+    core::PlanResult planResult;
+    planResult.plan = street.plan;
     surface = alignedSurface(surface, *planResult.plan, usable, photoFolder, poses.focalPixels,
                              photoSize, result.alignment, cancel);
     planResult = core::makeStitchPlan(surface, usable, poses.focalPixels, photoSize.width(),

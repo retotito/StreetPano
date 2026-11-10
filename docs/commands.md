@@ -11,7 +11,10 @@ cd ~/projects/StreetPano
 
 The app opens on **Projects**, where you can create a project for a folder of photos or open a
 recent one. The steps along the top take a street from photos to a finished panorama:
-**Projects**, **① Photos**, **② Align** (coming next), **③ Edit** and **④ Export**.
+**Projects**, **① Photos**, **② Align**, **③ Edit** and **④ Export**. In **② Align**, the
+photos are shown side by side. **Add Horizontal Guide** puts a line across all of them, which
+you can drag to a roofline or window line. Right-click a guide, or drag it off the photos, to
+remove it. **Stitch Panorama** is at the end of this step.
 
 ## Stitch your photos
 

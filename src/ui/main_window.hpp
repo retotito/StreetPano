@@ -21,9 +21,11 @@
 #include <vector>
 
 #include "core/lru_cache.hpp"
+#include "stitch/alignment.hpp"
 #include "stitch/decisions.hpp"
 #include "stitch/project.hpp"
 #include "stitch/stitcher.hpp"
+#include "ui/align_job.hpp"
 #include "ui/image_loader.hpp"
 #include "ui/photo_list_model.hpp"
 #include "ui/photo_view.hpp"
@@ -57,6 +59,17 @@ class MainWindow : public QMainWindow {
     void setStep(Step step);
     [[nodiscard]] Step step() const { return step_; }
     [[nodiscard]] QAction* stepAction(Step step) const;
+
+    // Aligning. The photos are shown side by side at the same scale, with guide lines that are
+    // heights on the wall, saved with the project.
+    [[nodiscard]] bool isPreparingAlignment() const { return alignJob_ != nullptr; }
+    [[nodiscard]] const stitch::AlignmentView& alignmentView() const { return alignmentView_; }
+    [[nodiscard]] PhotoView* alignView() const { return alignView_; }
+    [[nodiscard]] std::size_t guideCount() const { return alignment_.guides.size(); }
+    [[nodiscard]] QString alignmentPath() const { return alignmentPath_; }
+    bool addGuide();
+    bool moveGuide(int index, double row);
+    bool removeGuide(int index);
 
     // Saves the panorama with its edits. The format follows the file's extension.
     bool savePanoramaAs(const QString& path);
@@ -137,6 +150,10 @@ class MainWindow : public QMainWindow {
     void applyStep(Step step);
     void updateStepActions();
     void displayPanorama();
+    void startAlignment();
+    void onAlignmentFinished();
+    void showGuides();
+    void saveGuides();
     [[nodiscard]] bool isStepAvailable(Step step) const;
     [[nodiscard]] QWidget* createProjectsPage();
     [[nodiscard]] QWidget* createExportPage();
@@ -197,7 +214,13 @@ class MainWindow : public QMainWindow {
     QLabel* projectsMessage_ = nullptr;
     QLabel* exportInfo_ = nullptr;
     std::vector<QAction*> stepActions_;
-    QToolBar* photosTools_ = nullptr;
+    QToolBar* alignTools_ = nullptr;
+    PhotoView* alignView_ = nullptr;
+    std::unique_ptr<AlignJob> alignJob_;
+    stitch::AlignmentView alignmentView_;
+    stitch::Alignment alignment_;
+    QString alignmentPath_;
+    QAction* showGridAction_ = nullptr;
     QToolBar* editTools_ = nullptr;
     QDockWidget* editsDock_ = nullptr;
     QPolygonF pendingArea_;

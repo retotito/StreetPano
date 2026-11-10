@@ -17,6 +17,8 @@ target_include_directories(streetpano_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(streetpano_core PUBLIC streetpano_options)
 
 add_library(streetpano_stitch STATIC
+    stitch/alignment.cpp
+    stitch/alignment.hpp
     stitch/decisions.cpp
     stitch/decisions.hpp
     stitch/pose_file.cpp
@@ -28,6 +30,8 @@ add_library(streetpano_stitch STATIC
 target_link_libraries(streetpano_stitch PUBLIC streetpano_core Qt6::Gui)
 
 add_library(streetpano_ui STATIC
+    ui/align_job.cpp
+    ui/align_job.hpp
     ui/film_strip_delegate.cpp
     ui/film_strip_delegate.hpp
     ui/image_loader.cpp

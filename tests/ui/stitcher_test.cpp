@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "core/stitch_plan.hpp"
+#include "stitch/alignment.hpp"
 #include "stitch/decisions.hpp"
 #include "stitch/pose_file.hpp"
 #include "stitch_fixture.hpp"
@@ -50,6 +51,11 @@ class StitcherTest : public QObject {
     void matchesTheTrueFacadeWhenReduced();
     void alignsAWallThatStartsTooNear();
     void patchesAreDrawnFromTheOriginalPhoto();
+    void thePhotosAreShownSideBySide();
+    void aHeightIsTheSameRowInEveryPhoto();
+    void aStreetThatCantBePreparedSaysWhy();
+    void guidesAreSavedAndReadBack();
+    void damagedGuidesAreRefused();
     void aPatchWithAnUnknownPhotoGivesAWarning();
     void aPatchWithAMissingPhotoGivesAWarning();
     void noPatchesLeaveTheBaseAsItIs();
@@ -347,6 +353,104 @@ void StitcherTest::noPatchesLeaveTheBaseAsItIs() {
     QStringList warnings;
     const QImage same = withPatches(result, QDir(street.folder.path()), {}, warnings);
     QCOMPARE(same, result.base);
+}
+
+void StitcherTest::thePhotosAreShownSideBySide() {
+    const Street street;
+    const auto prepared =
+        streetpano::stitch::prepareStreet(street.poses(), QDir(street.folder.path()));
+    QVERIFY(prepared.error.isEmpty());
+    int calls = 0;
+    const auto view = streetpano::stitch::buildAlignmentView(prepared, QDir(street.folder.path()),
+                                                             120, [&calls](int, int) { ++calls; });
+    QVERIFY(view.error.isEmpty());
+    QCOMPARE(static_cast<int>(view.tiles.size()), kPhotos);
+    QCOMPARE(calls, kPhotos);
+    QCOMPARE(view.strip.height(), 120);
+    // Tiles follow each other, with a gap between them.
+    for (std::size_t index = 1; index < view.tiles.size(); ++index) {
+        QVERIFY(view.tiles[index].left > view.tiles[index - 1].left + view.tiles[index - 1].width);
+    }
+    QCOMPARE(view.strip.width(),
+             view.tiles.back().left + view.tiles.back().width +
+                 (view.tiles[1].left - view.tiles[0].left - view.tiles[0].width));
+    // The middle of a tile shows the photo, and the gap shows the background.
+    const auto& tile = view.tiles[3];
+    QVERIFY(view.strip.pixel(tile.left + tile.width / 2, 60) !=
+            view.strip.pixel(tile.left - 2, 60));
+}
+
+void StitcherTest::aHeightIsTheSameRowInEveryPhoto() {
+    const Street street;
+    const auto prepared =
+        streetpano::stitch::prepareStreet(street.poses(), QDir(street.folder.path()));
+    const auto view =
+        streetpano::stitch::buildAlignmentView(prepared, QDir(street.folder.path()), 120);
+    QCOMPARE(view.rowForHeight(view.heightForRow(37.5)), 37.5);
+    QCOMPARE(view.heightForRow(0.0), view.topHeight);
+    // The fixture's facade is level, so a feature at one height is on one row in every tile.
+    const auto rowOfColour = [&view](const streetpano::stitch::AlignmentTile& tile) {
+        const QRgb wanted = view.strip.pixel(view.tiles[0].left + view.tiles[0].width / 2, 60);
+        int best = -1;
+        int bestDifference = 1000;
+        for (int y = 50; y < 70; ++y) {
+            const QRgb found = view.strip.pixel(tile.left + tile.width / 2, y);
+            const int difference = std::abs(qGreen(found) - qGreen(wanted));
+            if (difference < bestDifference) {
+                bestDifference = difference;
+                best = y;
+            }
+        }
+        return best;
+    };
+    // Green only changes with height in this fixture, so it marks rows.
+    QCOMPARE(rowOfColour(view.tiles[5]), rowOfColour(view.tiles[0]));
+}
+
+void StitcherTest::aStreetThatCantBePreparedSaysWhy() {
+    const QTemporaryDir empty;
+    const Street street;
+    const auto prepared = streetpano::stitch::prepareStreet(street.poses(), QDir(empty.path()));
+    QVERIFY(prepared.error.contains(QStringLiteral("None of the photos")));
+    const auto view = streetpano::stitch::buildAlignmentView(prepared, QDir(empty.path()), 120);
+    QVERIFY(view.strip.isNull());
+    QCOMPARE(view.error, prepared.error);
+    QVERIFY(!streetpano::stitch::buildAlignmentView({}, QDir(empty.path()), 120).error.isEmpty());
+    // Cancelling stops before the first photo.
+    const auto ready =
+        streetpano::stitch::prepareStreet(street.poses(), QDir(street.folder.path()));
+    const std::atomic<bool> cancel{true};
+    QVERIFY(
+        streetpano::stitch::buildAlignmentView(ready, QDir(street.folder.path()), 120, {}, &cancel)
+            .error.contains(QStringLiteral("Cancelled")));
+}
+
+void StitcherTest::guidesAreSavedAndReadBack() {
+    const QTemporaryDir folder;
+    const QString path =
+        streetpano::stitch::alignmentPathFor(folder.filePath(QStringLiteral("poses.json")));
+    QCOMPARE(path, folder.filePath(QStringLiteral("alignment.json")));
+    const auto missing = streetpano::stitch::readAlignment(path);
+    QVERIFY(missing.alignment.has_value());
+    QVERIFY(missing.alignment->guides.empty());
+    QVERIFY(streetpano::stitch::writeAlignment({{1.5, -2.25}}, path));
+    const auto read = streetpano::stitch::readAlignment(path);
+    QCOMPARE(read.alignment->guides, (std::vector<double>{1.5, -2.25}));
+    QVERIFY(!streetpano::stitch::writeAlignment({}, folder.filePath(QStringLiteral("no/a.json"))));
+}
+
+void StitcherTest::damagedGuidesAreRefused() {
+    const QTemporaryDir folder;
+    const QString path = folder.filePath(QStringLiteral("alignment.json"));
+    for (const QByteArray& content :
+         {QByteArray("{ no"), QByteArray(R"({"format_version": 2, "guides": []})"),
+          QByteArray(R"({"format_version": 1, "guides": ["a"]})")}) {
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        file.write(content);
+        file.close();
+        QVERIFY(!streetpano::stitch::readAlignment(path).alignment.has_value());
+    }
 }
 
 void StitcherTest::windowStitchesAndShowsThePanorama() {

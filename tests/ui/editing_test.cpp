@@ -54,6 +54,9 @@ class EditingTest : public QObject {
     void aProjectIsCreatedOpenedAndRemembered();
     void aProjectWhosePhotosAreGoneIsReported();
     void exportSavesThePanoramaWithItsEdits();
+    void alignShowsThePhotosSideBySide();
+    void guidesAreAddedMovedAndRemoved();
+    void alignWithoutCameraPositionsExplainsWhatToDo();
     void markingAnAreaSavesADecision();
     void editsCanBeUndoneAndRedone();
     void changingAPhotoStepsThroughTheChoices();
@@ -787,6 +790,70 @@ void EditingTest::exportSavesThePanoramaWithItsEdits() {
     QVERIFY(window.savePanoramaAs(path));
     QCOMPARE(QImage(path).size(), window.panorama().size());
     QVERIFY(!window.savePanoramaAs(street.folder.filePath(QStringLiteral("no/such/x.jpg"))));
+}
+
+void EditingTest::alignShowsThePhotosSideBySide() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(window.openFolder(street.folder.path()));
+    window.setStep(MainWindow::Step::Align);
+    QVERIFY(window.step() == MainWindow::Step::Align);
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isPreparingAlignment(), 30000);
+    QCOMPARE(static_cast<int>(window.alignmentView().tiles.size()), kPhotos);
+    QVERIFY(!window.alignView()->image().isNull());
+    // Stitching from here goes to the Edit step.
+    QVERIFY(window.startStitchFromFolder());
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    QVERIFY(window.step() == MainWindow::Step::Edit);
+    // Coming back doesn't prepare the photos again.
+    window.setStep(MainWindow::Step::Align);
+    QVERIFY(!window.isPreparingAlignment());
+}
+
+void EditingTest::guidesAreAddedMovedAndRemoved() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(window.openFolder(street.folder.path()));
+    QVERIFY(!window.addGuide());  // Nothing to put it on yet.
+    window.setStep(MainWindow::Step::Align);
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isPreparingAlignment(), 30000);
+    QVERIFY(window.addGuide());
+    QVERIFY(window.addGuide());
+    QCOMPARE(window.guideCount(), std::size_t{2});
+    QCOMPARE(window.alignView()->guides().size(), std::size_t{2});
+    QVERIFY(window.moveGuide(0, 30.0));
+    QCOMPARE(window.alignView()->guides().front(), 30.0);
+    QVERIFY(QFile::exists(window.alignmentPath()));
+    // Guides are saved, and come back when the street is opened again.
+    MainWindow again;
+    QVERIFY(again.openFolder(street.folder.path()));
+    again.setStep(MainWindow::Step::Align);
+    QTRY_VERIFY_WITH_TIMEOUT(!again.isPreparingAlignment(), 30000);
+    QCOMPARE(again.guideCount(), std::size_t{2});
+    QVERIFY(std::abs(again.alignView()->guides().front() - 30.0) < 1e-6);
+    // Dragging a guide off the photos, or right-clicking it, removes it.
+    QVERIFY(again.moveGuide(0, -5.0));
+    QCOMPARE(again.guideCount(), std::size_t{1});
+    emit again.alignView()->imageRightClicked(QPointF(10, again.alignView()->guides().front()),
+                                              QPoint());
+    QCOMPARE(again.guideCount(), std::size_t{0});
+    QVERIFY(!again.moveGuide(3, 10.0));
+    QVERIFY(!again.removeGuide(-1));
+    // The grid can be switched off and on.
+    again.setStep(MainWindow::Step::Align);
+    QVERIFY(QFile::remove(again.alignmentPath()));
+}
+
+void EditingTest::alignWithoutCameraPositionsExplainsWhatToDo() {
+    QTemporaryDir folder;
+    for (int index = 0; index < 3; ++index) {
+        streetpano::test::StreetFixture::writePhoto(folder, index);
+    }
+    MainWindow window;
+    QVERIFY(window.openFolder(folder.path()));
+    window.setStep(MainWindow::Step::Align);
+    QVERIFY(!window.isPreparingAlignment());
+    QVERIFY(window.alignView()->message().contains(QStringLiteral("stitch.sh")));
 }
 
 QTEST_MAIN(EditingTest)
