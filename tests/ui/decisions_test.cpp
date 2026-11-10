@@ -22,6 +22,7 @@ class DecisionsTest : public QObject {
     void writtenDecisionsReadBackTheSame();
     void anAreaCanHoldJustADescription();
     void aLineCanHoldADescription();
+    void aMarkedAreaNeedsNoChoiceYet();
     void rejectsADamagedFile();
     void rejectsADifferentVersion();
     void rejectsBadEdits_data();
@@ -104,6 +105,15 @@ void DecisionsTest::aLineCanHoldADescription() {
                  folder,
                  R"({"format_version": 1, "patches": [{"photo": "a.jpg", "outline": [[0, 0], [5, 0]]}]})"))
              .decisions.has_value());
+}
+
+void DecisionsTest::aMarkedAreaNeedsNoChoiceYet() {
+    const QTemporaryDir folder;
+    const auto result = readDecisions(write(
+        folder,
+        R"({"format_version": 1, "patches": [{"kind": "marked", "outline": [[0, 0], [1, 0], [1, 1]]}]})"));
+    QVERIFY(result.decisions.has_value());
+    QCOMPARE(result.decisions->patches[0].kind, std::string("marked"));
 }
 
 void DecisionsTest::rejectsADamagedFile() {

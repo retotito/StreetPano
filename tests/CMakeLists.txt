@@ -31,6 +31,7 @@ add_ui_test(main_window_test)
 add_ui_test(decisions_test)
 add_ui_test(pose_file_test)
 add_ui_test(stitcher_test)
+add_ui_test(editing_test)
 
 add_executable(app_screenshot ui/app_screenshot.cpp)
 target_link_libraries(app_screenshot PRIVATE streetpano_ui Qt6::Test)
