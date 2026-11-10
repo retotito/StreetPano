@@ -87,10 +87,8 @@ MainWindow::MainWindow(std::size_t previewBudgetBytes, QWidget* parent)
 
     pages_ = makeChild<QStackedWidget>(this);
     projectsPage_ = createProjectsPage();
-    alignPage_ = makeChild<QLabel>(
-        pages_, tr("Align\n\nAll photos side by side, with guide lines to straighten them.\n"
-                   "Coming next."));
-    static_cast<QLabel*>(alignPage_)->setAlignment(Qt::AlignCenter);
+    alignView_ = makeChild<PhotoView>(this);
+    alignPage_ = alignView_;
     exportPage_ = createExportPage();
     pages_->addWidget(projectsPage_);
     pages_->addWidget(workPage_);
@@ -116,7 +114,7 @@ MainWindow::MainWindow(std::size_t previewBudgetBytes, QWidget* parent)
     addStep(tr("Projects"), tr("Create, open and switch between streets"), Step::Projects);
     steps->addSeparator();
     addStep(tr("\u2460 Photos"), tr("Check the photos, and stitch them"), Step::Photos);
-    addStep(tr("\u2461 Align"), tr("Straighten the photos with guide lines (coming next)"),
+    addStep(tr("\u2461 Align"), tr("Line the photos up with guide lines, then stitch them"),
             Step::Align);
     addStep(tr("\u2462 Edit"), tr("Remove, keep and describe objects on the panorama"), Step::Edit);
     addStep(tr("\u2463 Export"), tr("Save the finished panorama"), Step::Export);
@@ -146,12 +144,29 @@ MainWindow::MainWindow(std::size_t previewBudgetBytes, QWidget* parent)
     QAction* stitchAction = stitchMenu->addAction(tr("&Quick Stitch…"));
     stitchAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
     connect(stitchAction, &QAction::triggered, this, &MainWindow::chooseStitch);
+    // Stitching ends the Align step, once the photos are lined up.
     stitchAction->setIconText(tr("Stitch Panorama"));
-    photosTools_ = addToolBar(tr("Photos"));
-    photosTools_->setObjectName(QStringLiteral("photos"));
-    photosTools_->setMovable(false);
-    photosTools_->setToolButtonStyle(Qt::ToolButtonTextOnly);
-    photosTools_->addAction(stitchAction);
+    alignTools_ = addToolBar(tr("Align"));
+    alignTools_->setObjectName(QStringLiteral("align"));
+    alignTools_->setMovable(false);
+    alignTools_->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    QAction* addGuideAction = alignTools_->addAction(tr("Add Horizontal Guide"));
+    addGuideAction->setToolTip(
+        tr("A line across all photos. Drag it to a roofline or window line. Right-click a guide "
+           "to remove it"));
+    connect(addGuideAction, &QAction::triggered, this, [this] { addGuide(); });
+    showGridAction_ = alignTools_->addAction(tr("Show Grid"));
+    showGridAction_->setCheckable(true);
+    showGridAction_->setChecked(true);
+    connect(showGridAction_, &QAction::toggled, this, [this](bool shown) {
+        alignView_->setGrid(
+            shown && !alignmentView_.strip.isNull() ? alignmentView_.strip.height() / 12.0 : 0.0);
+    });
+    alignTools_->addSeparator();
+    alignTools_->addAction(stitchAction);
+    connect(alignView_, &PhotoView::guideMoved, this, &MainWindow::moveGuide);
+    connect(alignView_, &PhotoView::imageRightClicked, this,
+            [this](QPointF point, QPoint) { removeGuide(alignView_->guideAt(point)); });
     showPanoramaAction_ = stitchMenu->addAction(tr("Show &Panorama"));
     showPanoramaAction_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_P));
     showPanoramaAction_->setEnabled(false);
@@ -347,6 +362,14 @@ void MainWindow::chooseFolder() {
 
 bool MainWindow::openFolder(const QString& folder) {
     cancelStitch();
+    // A new street needs its own side-by-side view.
+    alignJob_.reset();
+    alignmentView_ = stitch::AlignmentView{};
+    alignment_ = stitch::Alignment{};
+    alignmentPath_.clear();
+    alignView_->setGuides({});
+    alignView_->setGrid(0.0);
+    alignView_->setMessage(tr("Preparing the photos…"));
     panorama_ = QImage{};
     panoramaPath_.clear();
     stitchMessage_.clear();
@@ -521,6 +544,9 @@ void MainWindow::applyStep(Step step) {
             break;
         case Step::Align:
             pages_->setCurrentWidget(alignPage_);
+            if (alignmentView_.strip.isNull() && alignJob_ == nullptr) {
+                startAlignment();
+            }
             break;
         case Step::Export:
             pages_->setCurrentWidget(exportPage_);
@@ -528,7 +554,7 @@ void MainWindow::applyStep(Step step) {
     }
     // Each step shows only its own tools.
     strip_->setVisible(step == Step::Photos);
-    photosTools_->setVisible(step == Step::Photos);
+    alignTools_->setVisible(step == Step::Align);
     editTools_->setVisible(step == Step::Edit);
     editsDock_->setVisible(step == Step::Edit);
     if (step != Step::Edit && markAreaAction_->isChecked()) {
@@ -556,6 +582,98 @@ void MainWindow::setStep(Step step) {
     } else {
         applyStep(step);
     }
+}
+
+void MainWindow::startAlignment() {
+    const QString posesPath = findPosesFile();
+    if (posesPath.isEmpty()) {
+        alignView_->setMessage(
+            tr("These photos don't have camera positions yet.\n\nIn the Terminal, run:\n"
+               "cd ~/projects/StreetPano\n./scripts/stitch.sh \"%1\"")
+                .arg(currentFolder_));
+        return;
+    }
+    constexpr int kStripHeight = 900;
+    alignmentPath_ = stitch::alignmentPathFor(posesPath);
+    alignJob_ = std::make_unique<AlignJob>(posesPath, QDir(currentFolder_), kStripHeight);
+    connect(alignJob_.get(), &AlignJob::progressChanged, this, &MainWindow::updateStatus);
+    connect(alignJob_.get(), &AlignJob::finished, this, &MainWindow::onAlignmentFinished);
+    alignView_->setMessage(tr("Preparing the photos…"));
+    alignJob_->start();
+    updateStatus();
+}
+
+void MainWindow::onAlignmentFinished() {
+    if (alignJob_ == nullptr) {
+        return;
+    }
+    alignmentView_ = alignJob_->takeView();
+    alignJob_.reset();
+    if (alignmentView_.strip.isNull()) {
+        alignView_->setMessage(tr("The photos couldn't be prepared: %1").arg(alignmentView_.error));
+        updateStatus();
+        return;
+    }
+    const stitch::AlignmentResult saved = stitch::readAlignment(alignmentPath_);
+    alignment_ = saved.alignment.value_or(stitch::Alignment{});
+    if (!saved.alignment.has_value()) {
+        editMessage_ = saved.error;
+    }
+    alignView_->setImage(alignmentView_.strip);
+    alignView_->fitHeight();
+    alignView_->setGrid(showGridAction_->isChecked() ? alignmentView_.strip.height() / 12.0 : 0.0);
+    showGuides();
+    updateStatus();
+}
+
+void MainWindow::showGuides() {
+    std::vector<double> rows;
+    rows.reserve(alignment_.guides.size());
+    for (const double height : alignment_.guides) {
+        rows.push_back(alignmentView_.rowForHeight(height));
+    }
+    alignView_->setGuides(std::move(rows));
+}
+
+void MainWindow::saveGuides() {
+    if (!alignmentPath_.isEmpty() && !stitch::writeAlignment(alignment_, alignmentPath_)) {
+        editMessage_ = tr("The guides couldn't be saved to %1.").arg(alignmentPath_);
+        updateStatus();
+    }
+}
+
+bool MainWindow::addGuide() {
+    if (alignmentView_.strip.isNull()) {
+        return false;
+    }
+    alignment_.guides.push_back(alignmentView_.heightForRow(alignmentView_.strip.height() / 2.0));
+    saveGuides();
+    showGuides();
+    return true;
+}
+
+bool MainWindow::moveGuide(int index, double row) {
+    if (index < 0 || index >= static_cast<int>(alignment_.guides.size())) {
+        return false;
+    }
+    // Dragging a guide off the photos removes it.
+    if (row < 0.0 || row > alignmentView_.strip.height()) {
+        return removeGuide(index);
+    }
+    alignment_.guides[static_cast<std::size_t>(index)] = alignmentView_.heightForRow(row);
+    saveGuides();
+    showGuides();
+    return true;
+}
+
+bool MainWindow::removeGuide(int index) {
+    if (index < 0 || index >= static_cast<int>(alignment_.guides.size())) {
+        return false;
+    }
+    alignment_.guides.erase(alignment_.guides.begin() + index);
+    saveGuides();
+    showGuides();
+    return true;
 }
 
 QWidget* MainWindow::createProjectsPage() {
@@ -1329,6 +1447,12 @@ void MainWindow::updateStatus() {
         panoramaBytes += static_cast<double>(stitched_.base.sizeInBytes());
     }
     const double panorama = panoramaBytes / kBytesPerMegabyte;
+    if (alignJob_ != nullptr) {
+        positionLabel_->setText(
+            alignJob_->total() > 0
+                ? tr("Preparing photo %1 of %2…").arg(alignJob_->done()).arg(alignJob_->total())
+                : tr("Preparing the photos…"));
+    }
     if (stitchJob_ != nullptr && stitchJob_->total() > 0) {
         stitchMessage_ =
             tr("Stitching photo %1 of %2…").arg(stitchJob_->done()).arg(stitchJob_->total());

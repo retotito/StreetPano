@@ -33,6 +33,16 @@ class PhotoView : public QWidget {
     void setLassoMode(bool enabled);
     void setMarkShape(MarkShape shape) { markShape_ = shape; }
     [[nodiscard]] MarkShape markShape() const { return markShape_; }
+    // A faint grid over the image, every spacing image pixels. Zero turns it off.
+    void setGrid(double spacing);
+    // Horizontal guide lines across the whole image, as image rows. They can be dragged.
+    void setGuides(std::vector<double> rows);
+    [[nodiscard]] const std::vector<double>& guides() const { return guides_; }
+    // Returns the guide near this image point, within a few screen pixels, or -1.
+    [[nodiscard]] int guideAt(QPointF imagePoint) const;
+
+    // Fills the view's height and starts at the left, for a long strip of photos.
+    void fitHeight();
     // Zooms and pans so that this part of the image fills most of the view.
     void showArea(const QRectF& imageArea);
     // Outlines to draw over the image, in image coordinates. selected is highlighted, or -1.
@@ -51,6 +61,8 @@ class PhotoView : public QWidget {
     void lassoFinished(const QPolygonF& outline);
     // A click that wasn't a drag, in image coordinates.
     void imageClicked(QPointF point);
+    // A guide was dragged to this image row. A row outside the image means it was dragged off.
+    void guideMoved(int index, double row);
     // A right-click that wasn't a drag, in image coordinates, and on the screen.
     void imageRightClicked(QPointF point, QPoint screenPoint);
 
@@ -82,6 +94,9 @@ class PhotoView : public QWidget {
     MarkShape markShape_ = MarkShape::Freehand;
     std::vector<QPolygonF> outlines_;
     int selectedOutline_ = -1;
+    double gridSpacing_ = 0.0;
+    std::vector<double> guides_;
+    int draggedGuide_ = -1;
 };
 
 }  // namespace streetpano::ui

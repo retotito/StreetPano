@@ -49,6 +49,18 @@ struct PlanResult {
                                         int photoWidth, int photoHeight,
                                         const StitchOptions& options);
 
+// Where all of one photo lands on the panorama, in panorama pixels. Empty if it doesn't look at
+// the facade.
+struct PixelBox {
+    int left = 0;
+    int right = 0;  // One past the last column.
+    int top = 0;
+    int bottom = 0;  // One past the last row.
+};
+[[nodiscard]] std::optional<PixelBox> photoBox(const FacadeSurface& surface, const StitchPlan& plan,
+                                               const CameraPose& pose, double focalPixels,
+                                               int photoWidth, int photoHeight);
+
 // Returns what to multiply a new photo by to match what's drawn so far, where they overlap.
 // region holds the new photo from column firstX onwards, with zero alpha where it has no pixels.
 [[nodiscard]] double brightnessGain(const CanvasView& canvas, const ImageView& region, int firstX,

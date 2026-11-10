@@ -25,6 +25,10 @@ class PhotoViewTest : public QObject {
     void aDragIsNotAClick();
     void aRightClickReportsItsImagePoint();
     void aTrackpadMovesTheView();
+    void aGuideCanBeDragged();
+    void aLongStripFillsTheHeight();
+    void aGuideIsFoundOnlyNearby();
+    void theGridAndGuidesAreDrawn();
     void aRectangleIsDraggedFromCornerToCorner();
     void aLineIsDraggedFromStartToEnd();
     void aClickDrawsNoRectangleOrLine();
@@ -328,6 +332,73 @@ void PhotoViewTest::aClickDrawsNoRectangleOrLine() {
     QVERIFY(dragShape(view, PhotoView::MarkShape::Line, QPoint(10, 20), QPoint(11, 20)).isEmpty());
     QVERIFY(
         dragShape(view, PhotoView::MarkShape::Rectangle, QPoint(10, 20), QPoint(11, 21)).isEmpty());
+}
+
+void PhotoViewTest::aLongStripFillsTheHeight() {
+    PhotoView view;
+    view.resize(400, 200);
+    QImage image(4000, 100, QImage::Format_RGB32);
+    image.fill(Qt::gray);
+    view.setImage(image);
+    view.fitHeight();
+    QCOMPARE(view.zoom(), 2.0);
+    QCOMPARE(view.offset(), QPointF(0, 0));
+    QVERIFY(!view.isFitted());
+    PhotoView empty;
+    empty.fitHeight();  // Nothing to show, so nothing happens.
+    QCOMPARE(empty.zoom(), 1.0);
+}
+
+void PhotoViewTest::aGuideCanBeDragged() {
+    PhotoView view;
+    view.resize(400, 200);
+    QImage image(800, 400, QImage::Format_RGB32);
+    image.fill(Qt::gray);
+    view.setImage(image);  // Fitted at half size.
+    view.setGuides({100.0});
+    QSignalSpy moved(&view, &PhotoView::guideMoved);
+    QSignalSpy clicked(&view, &PhotoView::imageClicked);
+    QTest::mousePress(&view, Qt::LeftButton, Qt::NoModifier, QPoint(50, 51));
+    QMouseEvent move(QEvent::MouseMove, QPointF(50, 80), view.mapToGlobal(QPointF(50, 80)),
+                     Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(&view, &move);
+    QCOMPARE(view.guides().front(), 160.0);  // Follows the mouse while dragging.
+    QTest::mouseRelease(&view, Qt::LeftButton, Qt::NoModifier, QPoint(50, 80));
+    QCOMPARE(moved.count(), 1);
+    QCOMPARE(moved.at(0).at(0).toInt(), 0);
+    QCOMPARE(moved.at(0).at(1).toDouble(), 160.0);
+    QCOMPARE(clicked.count(), 0);
+    QVERIFY(view.offset() == QPointF(0, 0));  // The image didn't move.
+}
+
+void PhotoViewTest::aGuideIsFoundOnlyNearby() {
+    PhotoView view;
+    view.resize(400, 200);
+    QImage image(800, 400, QImage::Format_RGB32);
+    image.fill(Qt::gray);
+    view.setImage(image);
+    view.setGuides({100.0, 300.0});
+    QCOMPARE(view.guideAt(QPointF(10, 104)), 0);
+    QCOMPARE(view.guideAt(QPointF(10, 297)), 1);
+    QCOMPARE(view.guideAt(QPointF(10, 200)), -1);
+}
+
+void PhotoViewTest::theGridAndGuidesAreDrawn() {
+    PhotoView view;
+    view.resize(400, 200);
+    QImage image(400, 200, QImage::Format_RGB32);
+    image.fill(Qt::black);
+    view.setImage(image);
+    view.setGrid(50.0);
+    view.setGuides({120.0});
+    const QImage grabbed = view.grab().toImage();
+    QVERIFY(qGray(grabbed.pixel(25, 50)) > 10);  // A faint grid line.
+    QVERIFY(qGray(grabbed.pixel(25, 50)) < 80);
+    QVERIFY(qBlue(grabbed.pixel(25, 120)) > 150);  // A guide.
+    QCOMPARE(qGray(grabbed.pixel(25, 75)), 0);     // Between lines.
+    view.setGrid(0.0);
+    view.setGuides({});
+    QCOMPARE(qGray(view.grab().toImage().pixel(25, 50)), 0);
 }
 
 void PhotoViewTest::aTrackpadMovesTheView() {

@@ -191,6 +191,27 @@ double brightnessGain(const CanvasView& canvas, const ImageView& region, int fir
         kMinGain, kMaxGain);
 }
 
+std::optional<PixelBox> photoBox(const FacadeSurface& surface, const StitchPlan& plan,
+                                 const CameraPose& pose, double focalPixels, int photoWidth,
+                                 int photoHeight) {
+    const std::optional<SurfaceHit> axis = surface.hit(pose.center, pose.forward());
+    if (!axis.has_value() || plan.unitsPerPixel <= 0.0) {
+        return std::nullopt;
+    }
+    const Extent extent = footprint(surface, pose, focalPixels, photoWidth, photoHeight, axis->arc);
+    if (!(extent.right > extent.left) || !(extent.top > extent.bottom)) {
+        return std::nullopt;
+    }
+    const auto toColumn = [&plan](double arc) {
+        return static_cast<int>(std::floor((arc - plan.leftArc) / plan.unitsPerPixel));
+    };
+    const auto toRow = [&plan](double height) {
+        return static_cast<int>(std::floor((plan.topHeight - height) / plan.unitsPerPixel));
+    };
+    return PixelBox{toColumn(extent.left), toColumn(extent.right) + 1, toRow(extent.top),
+                    toRow(extent.bottom) + 1};
+}
+
 std::vector<int> findSeam(const CanvasView& canvas, const ImageView& region, int firstX,
                           int preferredX, int reach) {
     const int width = region.width;

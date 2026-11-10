@@ -96,6 +96,25 @@ void PhotoView::paintEvent(QPaintEvent* /*event*/) {
             painter.drawPolyline(inWidget);
         }
     };
+    const QRectF shown(offset_, QSizeF(image_.size()) * zoom_);
+    if (gridSpacing_ > 0.0) {
+        painter.setPen(QPen(QColor(255, 255, 255, 45), 1.0));
+        // Counting lines, rather than adding up spacing, keeps rounding from creeping in.
+        for (int line = 0; line * gridSpacing_ < image_.height(); ++line) {
+            const double y = offset_.y() + line * gridSpacing_ * zoom_;
+            painter.drawLine(QPointF(shown.left(), y), QPointF(shown.right(), y));
+        }
+        for (int line = 0; line * gridSpacing_ < image_.width(); ++line) {
+            const double x = offset_.x() + line * gridSpacing_ * zoom_;
+            painter.drawLine(QPointF(x, shown.top()), QPointF(x, shown.bottom()));
+        }
+    }
+    for (std::size_t index = 0; index < guides_.size(); ++index) {
+        const bool dragged = static_cast<int>(index) == draggedGuide_;
+        painter.setPen(QPen(dragged ? QColor(255, 196, 0) : QColor(0, 200, 255), 2.0));
+        const double y = offset_.y() + guides_[index] * zoom_;
+        painter.drawLine(QPointF(shown.left(), y), QPointF(shown.right(), y));
+    }
     painter.setRenderHint(QPainter::Antialiasing);
     for (std::size_t index = 0; index < outlines_.size(); ++index) {
         const bool selected = static_cast<int>(index) == selectedOutline_;
@@ -146,6 +165,17 @@ void PhotoView::setLassoMode(bool enabled) {
     update();
 }
 
+void PhotoView::fitHeight() {
+    if (image_.isNull()) {
+        return;
+    }
+    zoom_ = std::clamp(static_cast<double>(height()) / image_.height(),
+                       std::min(fitZoom(), kMaxZoom), kMaxZoom);
+    offset_ = QPointF(0.0, (height() - image_.height() * zoom_) / 2.0);
+    fitted_ = false;
+    update();
+}
+
 void PhotoView::showArea(const QRectF& imageArea) {
     constexpr double kShare = 0.6;  // Leaves some of the surroundings in view.
     if (image_.isNull() || imageArea.isEmpty()) {
@@ -159,6 +189,31 @@ void PhotoView::showArea(const QRectF& imageArea) {
     update();
 }
 
+void PhotoView::setGrid(double spacing) {
+    gridSpacing_ = spacing;
+    update();
+}
+
+void PhotoView::setGuides(std::vector<double> rows) {
+    guides_ = std::move(rows);
+    draggedGuide_ = -1;
+    update();
+}
+
+int PhotoView::guideAt(QPointF imagePoint) const {
+    constexpr double kReachScreenPixels = 6.0;
+    int found = -1;
+    double nearest = kReachScreenPixels / std::max(zoom_, 1e-9);
+    for (std::size_t index = 0; index < guides_.size(); ++index) {
+        const double distance = std::abs(guides_[index] - imagePoint.y());
+        if (distance <= nearest) {
+            nearest = distance;
+            found = static_cast<int>(index);
+        }
+    }
+    return found;
+}
+
 void PhotoView::setOutlines(std::vector<QPolygonF> outlines, int selected) {
     outlines_ = std::move(outlines);
     selectedOutline_ = selected;
@@ -169,6 +224,13 @@ void PhotoView::mousePressEvent(QMouseEvent* event) {
     lastDragPoint_ = event->position();
     pressPoint_ = event->position();
     moved_ = false;
+    if (!lassoMode_ && event->button() == Qt::LeftButton && !image_.isNull()) {
+        draggedGuide_ = guideAt(toImage(event->position()));
+        if (draggedGuide_ >= 0) {
+            update();
+            return;
+        }
+    }
     if (lassoMode_ && event->button() == Qt::LeftButton && !image_.isNull()) {
         lassoStart_ = toImage(event->position());
         lasso_ = QPolygonF{lassoStart_};
@@ -180,6 +242,11 @@ void PhotoView::mouseMoveEvent(QMouseEvent* event) {
     constexpr double kClickSlopPixels = 4.0;
     if ((event->position() - pressPoint_).manhattanLength() > kClickSlopPixels) {
         moved_ = true;
+    }
+    if (draggedGuide_ >= 0 && (event->buttons() & Qt::LeftButton) != 0U) {
+        guides_[static_cast<std::size_t>(draggedGuide_)] = toImage(event->position()).y();
+        update();
+        return;
     }
     if (lassoMode_ && (event->buttons() & Qt::LeftButton) != 0U) {
         if (!lasso_.isEmpty()) {
@@ -214,6 +281,13 @@ void PhotoView::mouseReleaseEvent(QMouseEvent* event) {
         emit imageRightClicked(toImage(event->position()), event->globalPosition().toPoint());
     }
     if (event->button() != Qt::LeftButton) {
+        return;
+    }
+    if (draggedGuide_ >= 0) {
+        const int index = draggedGuide_;
+        draggedGuide_ = -1;
+        update();
+        emit guideMoved(index, toImage(event->position()).y());
         return;
     }
     if (lassoMode_ && !lasso_.isEmpty()) {
