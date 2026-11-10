@@ -13,6 +13,8 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Mark with a rectangle or a line, as well as freehand. A line holds a description, such as
+  "this should be exactly horizontal"
 - Marking stays on until Esc, so several objects can be outlined in a row, and on a trackpad
   two fingers move the view and pinching zooms
 - An edits panel that lists every edit, can switch one off and changes their order, and

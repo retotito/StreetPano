@@ -21,6 +21,7 @@ class DecisionsTest : public QObject {
     void aMissingFileMeansNoEditsYet();
     void writtenDecisionsReadBackTheSame();
     void anAreaCanHoldJustADescription();
+    void aLineCanHoldADescription();
     void rejectsADamagedFile();
     void rejectsADifferentVersion();
     void rejectsBadEdits_data();
@@ -88,6 +89,21 @@ void DecisionsTest::anAreaCanHoldJustADescription() {
     QVERIFY(result.decisions.has_value());
     QVERIFY(result.decisions->patches[0].photo.empty());
     QCOMPARE(result.decisions->patches[0].note, std::string("remove the van"));
+}
+
+void DecisionsTest::aLineCanHoldADescription() {
+    const QTemporaryDir folder;
+    const auto result = readDecisions(write(
+        folder,
+        R"({"format_version": 1, "patches": [{"note": "straight", "outline": [[0, 0], [5, 0]]}]})"));
+    QVERIFY(result.decisions.has_value());
+    // A photo needs an area to fill, so a line with a photo is refused.
+    QVERIFY(
+        !readDecisions(
+             write(
+                 folder,
+                 R"({"format_version": 1, "patches": [{"photo": "a.jpg", "outline": [[0, 0], [5, 0]]}]})"))
+             .decisions.has_value());
 }
 
 void DecisionsTest::rejectsADamagedFile() {

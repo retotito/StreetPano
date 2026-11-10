@@ -67,6 +67,8 @@ class StitcherTest : public QObject {
     void tooFewPhotosCantRemove();
     void severalAreasCanBeDescribedInARow();
     void escapeStopsMarkingThenCancels();
+    void aLineCanOnlyBeDescribed();
+    void choosingAShapeTurnsMarkingOn();
     void finishedEditsAreNotOutlined();
     void theEditsPanelListsEveryEdit();
     void selectingInThePanelSelectsTheArea();
@@ -886,6 +888,47 @@ void StitcherTest::escapeStopsMarkingThenCancels() {
     QTest::keyClick(&window, Qt::Key_Escape);
     QVERIFY(!window.hasPendingArea());
     QTest::keyClick(&window, Qt::Key_Escape);  // Nothing left to stop.
+}
+
+void StitcherTest::aLineCanOnlyBeDescribed() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    const double y = window.panorama().height() / 2.0;
+    const QPolygonF line{QPointF(20, y), QPointF(220, y + 4)};
+    window.beginArea(line);
+    QVERIFY(window.hasPendingArea());
+    QVERIFY(window.editMessage().contains(QStringLiteral("line")));
+    QVERIFY(!window.removeObject());
+    QVERIFY(!window.keepObject());
+    QVERIFY(window.describeFix(QStringLiteral("should be exactly horizontal")));
+    QVERIFY(window.editsList()->item(0)->text().startsWith(QStringLiteral("1. Line")));
+    const auto saved = readDecisions(window.decisionsPath());
+    QVERIFY(saved.decisions.has_value());
+    QCOMPARE(saved.decisions->patches[0].outline.size(), std::size_t{2});
+    // A click near the line selects it, and one far from it doesn't.
+    window.selectAreaAt(QPointF(120, y + 2));
+    QCOMPARE(window.selectedArea(), 0);
+    window.selectAreaAt(QPointF(120, y + 200));
+    QCOMPARE(window.selectedArea(), -1);
+    window.selectAreaAt(QPointF(400, y));  // Beyond its end.
+    QCOMPARE(window.selectedArea(), -1);
+}
+
+void StitcherTest::choosingAShapeTurnsMarkingOn() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    window.setMarkShape(streetpano::ui::PhotoView::MarkShape::Line);
+    QVERIFY(window.markAreaAction()->isChecked());
+    QVERIFY(window.photoView()->markShape() == streetpano::ui::PhotoView::MarkShape::Line);
+    window.setMarkShape(streetpano::ui::PhotoView::MarkShape::Rectangle);
+    QVERIFY(window.photoView()->markShape() == streetpano::ui::PhotoView::MarkShape::Rectangle);
+    window.selectPhoto(1);
+    window.setMarkShape(streetpano::ui::PhotoView::MarkShape::Freehand);
+    QVERIFY(!window.markAreaAction()->isChecked());  // Only on the panorama.
 }
 
 void StitcherTest::windowStitchesAndShowsThePanorama() {

@@ -25,6 +25,9 @@ class PhotoViewTest : public QObject {
     void aDragIsNotAClick();
     void aRightClickReportsItsImagePoint();
     void aTrackpadMovesTheView();
+    void aRectangleIsDraggedFromCornerToCorner();
+    void aLineIsDraggedFromStartToEnd();
+    void aClickDrawsNoRectangleOrLine();
     void pinchingZooms();
     void outlinesAreDrawnOverTheImage();
     void startsEmptyWithAMessage();
@@ -272,6 +275,59 @@ void PhotoViewTest::aRightClickReportsItsImagePoint() {
     QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, QPoint(10, 20));
     QCOMPARE(clicked.count(), 1);
     QCOMPARE(clicked.at(0).at(0).toPointF(), QPointF(20.0, 40.0));
+}
+
+namespace {
+
+QPolygonF dragShape(PhotoView& view, PhotoView::MarkShape shape, QPoint from, QPoint to) {
+    view.setMarkShape(shape);
+    view.setLassoMode(true);
+    QSignalSpy finished(&view, &PhotoView::lassoFinished);
+    QTest::mousePress(&view, Qt::LeftButton, Qt::NoModifier, from);
+    QMouseEvent move(QEvent::MouseMove, QPointF(to), view.mapToGlobal(QPointF(to)), Qt::NoButton,
+                     Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(&view, &move);
+    QTest::mouseRelease(&view, Qt::LeftButton, Qt::NoModifier, to);
+    return finished.isEmpty() ? QPolygonF{} : finished.at(0).at(0).value<QPolygonF>();
+}
+
+}  // namespace
+
+void PhotoViewTest::aRectangleIsDraggedFromCornerToCorner() {
+    PhotoView view;
+    view.resize(400, 200);
+    QImage image(800, 400, QImage::Format_RGB32);
+    image.fill(Qt::gray);
+    view.setImage(image);  // Fitted at half size.
+    const QPolygonF rectangle =
+        dragShape(view, PhotoView::MarkShape::Rectangle, QPoint(10, 20), QPoint(60, 80));
+    QCOMPARE(rectangle.size(), 4);
+    QCOMPARE(rectangle.boundingRect(), QRectF(20, 40, 100, 120));
+    QVERIFY(view.markShape() == PhotoView::MarkShape::Rectangle);
+}
+
+void PhotoViewTest::aLineIsDraggedFromStartToEnd() {
+    PhotoView view;
+    view.resize(400, 200);
+    QImage image(800, 400, QImage::Format_RGB32);
+    image.fill(Qt::gray);
+    view.setImage(image);
+    const QPolygonF line =
+        dragShape(view, PhotoView::MarkShape::Line, QPoint(10, 20), QPoint(110, 25));
+    QCOMPARE(line.size(), 2);
+    QCOMPARE(line.at(0), QPointF(20, 40));
+    QCOMPARE(line.at(1), QPointF(220, 50));
+}
+
+void PhotoViewTest::aClickDrawsNoRectangleOrLine() {
+    PhotoView view;
+    view.resize(400, 200);
+    QImage image(800, 400, QImage::Format_RGB32);
+    image.fill(Qt::gray);
+    view.setImage(image);
+    QVERIFY(dragShape(view, PhotoView::MarkShape::Line, QPoint(10, 20), QPoint(11, 20)).isEmpty());
+    QVERIFY(
+        dragShape(view, PhotoView::MarkShape::Rectangle, QPoint(10, 20), QPoint(11, 21)).isEmpty());
 }
 
 void PhotoViewTest::aTrackpadMovesTheView() {

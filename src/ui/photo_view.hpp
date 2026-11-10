@@ -20,6 +20,9 @@ class PhotoView : public QWidget {
   public:
     static constexpr double kMaxZoom = 16.0;
 
+    // What a drag draws in lasso mode. A line is for marking something that should be straight.
+    enum class MarkShape { Freehand, Rectangle, Line };
+
     explicit PhotoView(QWidget* parent = nullptr);
 
     void setImage(const QImage& image);
@@ -28,6 +31,8 @@ class PhotoView : public QWidget {
     void zoomAround(QPointF widgetPoint, double factor);
 
     void setLassoMode(bool enabled);
+    void setMarkShape(MarkShape shape) { markShape_ = shape; }
+    [[nodiscard]] MarkShape markShape() const { return markShape_; }
     // Zooms and pans so that this part of the image fills most of the view.
     void showArea(const QRectF& imageArea);
     // Outlines to draw over the image, in image coordinates. selected is highlighted, or -1.
@@ -73,6 +78,8 @@ class PhotoView : public QWidget {
     bool moved_ = false;
     QPointF pressPoint_;
     QPolygonF lasso_;
+    QPointF lassoStart_;
+    MarkShape markShape_ = MarkShape::Freehand;
     std::vector<QPolygonF> outlines_;
     int selectedOutline_ = -1;
 };
