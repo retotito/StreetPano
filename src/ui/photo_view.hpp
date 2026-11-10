@@ -4,8 +4,10 @@
 #include <QPoint>
 #include <QPointF>
 #include <QPolygonF>
+#include <QRectF>
 #include <QString>
 #include <QWidget>
+#include <cstddef>
 #include <vector>
 
 namespace streetpano::ui {
@@ -26,10 +28,13 @@ class PhotoView : public QWidget {
     void zoomAround(QPointF widgetPoint, double factor);
 
     void setLassoMode(bool enabled);
+    // Zooms and pans so that this part of the image fills most of the view.
+    void showArea(const QRectF& imageArea);
     // Outlines to draw over the image, in image coordinates. selected is highlighted, or -1.
     void setOutlines(std::vector<QPolygonF> outlines, int selected);
 
     [[nodiscard]] bool isLassoMode() const { return lassoMode_; }
+    [[nodiscard]] std::size_t outlineCount() const { return outlines_.size(); }
     [[nodiscard]] const QImage& image() const { return image_; }
     [[nodiscard]] const QString& message() const { return message_; }
     [[nodiscard]] double zoom() const { return zoom_; }

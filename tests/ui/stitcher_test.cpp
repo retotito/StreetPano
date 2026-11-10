@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QFile>
 #include <QJsonArray>
+#include <QListWidget>
 #include <QMenu>
 #include <QPolygonF>
 #include <QSignalSpy>
@@ -64,6 +65,12 @@ class StitcherTest : public QObject {
     void theAreaMenuOffersTheChoices();
     void rightClickSelectsAnArea();
     void tooFewPhotosCantRemove();
+    void finishedEditsAreNotOutlined();
+    void theEditsPanelListsEveryEdit();
+    void selectingInThePanelSelectsTheArea();
+    void untickingAnEditSwitchesItOff();
+    void editsCanBeReordered();
+    void thePanelIsEmptyAwayFromThePanorama();
     void hidesExposureDifferencesAtSeams();
     void reportsProgress();
     void respectsTheMemoryBudget();
@@ -358,7 +365,7 @@ void StitcherTest::patchesAreDrawnFromTheOriginalPhoto() {
     QVERIFY(red.save(QDir(street.folder.path()).filePath(QStringLiteral("005.png"))));
 
     const QPolygonF square = squareAt(result.base);
-    const Patch patch{wallSquare(result, square), "005.png", {}};
+    const Patch patch{wallSquare(result, square), "005.png", {}, {}, false};
     QStringList warnings;
     const QImage patched = withPatches(result, QDir(street.folder.path()), {&patch, 1}, warnings);
     QVERIFY(warnings.isEmpty());
@@ -373,7 +380,7 @@ void StitcherTest::patchesAreDrawnFromTheOriginalPhoto() {
 void StitcherTest::aPatchWithAnUnknownPhotoGivesAWarning() {
     const Street street;
     const auto result = stitchPanorama(street.poses(), QDir(street.folder.path()));
-    const Patch patch{wallSquare(result, squareAt(result.base)), "not-here.png", {}};
+    const Patch patch{wallSquare(result, squareAt(result.base)), "not-here.png", {}, {}, false};
     QStringList warnings;
     const QImage patched = withPatches(result, QDir(street.folder.path()), {&patch, 1}, warnings);
     QCOMPARE(warnings.size(), 1);
@@ -384,7 +391,7 @@ void StitcherTest::aPatchWithAMissingPhotoGivesAWarning() {
     const Street street;
     const auto result = stitchPanorama(street.poses(), QDir(street.folder.path()));
     QVERIFY(QFile::remove(QDir(street.folder.path()).filePath(QStringLiteral("005.png"))));
-    const Patch patch{wallSquare(result, squareAt(result.base)), "005.png", {}};
+    const Patch patch{wallSquare(result, squareAt(result.base)), "005.png", {}, {}, false};
     QStringList warnings;
     const QImage patched = withPatches(result, QDir(street.folder.path()), {&patch, 1}, warnings);
     QCOMPARE(warnings.size(), 1);
@@ -714,6 +721,133 @@ void StitcherTest::tooFewPhotosCantRemove() {
     QVERIFY(!window.removeObject());
     QVERIFY(window.editMessage().contains(QStringLiteral("Too few")));
     QVERIFY(window.hasPendingArea());
+}
+
+void StitcherTest::finishedEditsAreNotOutlined() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    auto* view = window.photoView();
+    QVERIFY(window.memoryText().contains(QStringLiteral("panorama:")));
+    window.beginArea(squareAt(window.panorama()));
+    QCOMPARE(view->outlineCount(), std::size_t{1});  // The one being worked on.
+    QVERIFY(window.removeObject());
+    QCOMPARE(view->outlineCount(), std::size_t{1});  // Still selected.
+    window.selectAreaAt(QPointF(1, 1));
+    QCOMPARE(view->outlineCount(), std::size_t{0});  // Finished, so no line.
+    window.setOutlinesShown(true);
+    QVERIFY(window.showOutlinesAction()->isChecked());
+    QCOMPARE(view->outlineCount(), std::size_t{1});
+    window.setOutlinesShown(false);
+    QCOMPARE(view->outlineCount(), std::size_t{0});
+}
+
+void StitcherTest::theEditsPanelListsEveryEdit() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    QCOMPARE(window.editsList()->count(), 0);
+    window.beginArea(squareAt(window.panorama()));
+    QVERIFY(window.removeObject());
+    window.beginArea(squareAt(window.panorama(), 20));
+    QVERIFY(window.keepObject());
+    window.beginArea(squareAt(window.panorama(), 10));
+    QVERIFY(window.describeFix(QStringLiteral("repair the car")));
+    QCOMPARE(window.editsList()->count(), 3);
+    QVERIFY(window.editsList()->item(0)->text().contains(QStringLiteral("Remove")));
+    QVERIFY(window.editsList()->item(1)->text().contains(QStringLiteral("Keep whole")));
+    QVERIFY(window.editsList()->item(2)->text().contains(QStringLiteral("repair the car")));
+    QVERIFY(window.editsList()->item(2)->text().contains(QStringLiteral("no AI yet")));
+    QCOMPARE(window.editsList()->currentRow(), 2);
+    // What was chosen is saved, so the panel shows the same after stitching again.
+    const auto saved = readDecisions(window.decisionsPath());
+    QCOMPARE(saved.decisions->patches[0].kind, std::string("remove"));
+    QCOMPARE(saved.decisions->patches[1].kind, std::string("keep"));
+    QCOMPARE(saved.decisions->patches[2].kind, std::string("describe"));
+}
+
+void StitcherTest::selectingInThePanelSelectsTheArea() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    QVERIFY(window.markArea(squareAt(window.panorama())));
+    QVERIFY(window.markArea(squareAt(window.panorama(), 20)));
+    window.photoView()->resize(800, 400);
+    window.editsList()->setCurrentRow(0);
+    QCOMPARE(window.selectedArea(), 0);
+    QVERIFY(!window.photoView()->isFitted());  // Zoomed to the area.
+    window.selectArea(-1);
+    QCOMPARE(window.selectedArea(), -1);
+    window.selectArea(5);  // There's no such area, so nothing changes.
+    QCOMPARE(window.selectedArea(), -1);
+}
+
+void StitcherTest::untickingAnEditSwitchesItOff() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    const QImage before = window.panorama();
+    QVERIFY(window.markArea(squareAt(before)));
+    const QImage edited = window.panorama();
+    QVERIFY(edited != before);
+    window.editsList()->item(0)->setCheckState(Qt::Unchecked);
+    QCOMPARE(window.panorama(), before);
+    QCOMPARE(window.areaCount(), 1);  // Still there, only switched off.
+    QVERIFY(readDecisions(window.decisionsPath()).decisions->patches[0].hidden);
+    QCOMPARE(window.editsList()->item(0)->checkState(), Qt::Unchecked);
+    QVERIFY(!window.setAreaHidden(0, true));  // Already off.
+    QVERIFY(!window.setAreaHidden(3, true));
+    QVERIFY(window.undo());
+    QCOMPARE(window.panorama(), edited);
+    // Choosing again switches it back on.
+    QVERIFY(window.setAreaHidden(0, true));
+    QVERIFY(window.removeObject());
+    QVERIFY(window.editsList()->item(0)->checkState() == Qt::Checked);
+}
+
+void StitcherTest::editsCanBeReordered() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    window.beginArea(squareAt(window.panorama()));
+    QVERIFY(window.removeObject());
+    window.beginArea(squareAt(window.panorama(), 20));
+    QVERIFY(window.describeFix(QStringLiteral("second")));
+    QVERIFY(window.moveArea(1, 0));
+    QVERIFY(window.editsList()->item(0)->text().contains(QStringLiteral("second")));
+    QCOMPARE(window.selectedArea(), 0);
+    QCOMPARE(readDecisions(window.decisionsPath()).decisions->patches[0].note,
+             std::string("second"));
+    QVERIFY(!window.moveArea(0, 0));
+    QVERIFY(!window.moveArea(0, 7));
+    QVERIFY(window.undo());
+    QVERIFY(window.editsList()->item(1)->text().contains(QStringLiteral("second")));
+    // Dragging a row in the panel moves the edit the same way.
+    auto* model = window.editsList()->model();
+    QVERIFY(model->moveRow(QModelIndex(), 1, QModelIndex(), 0));
+    QTRY_VERIFY(window.editsList()->item(0)->text().contains(QStringLiteral("second")));
+    QCOMPARE(readDecisions(window.decisionsPath()).decisions->patches[0].note,
+             std::string("second"));
+}
+
+void StitcherTest::thePanelIsEmptyAwayFromThePanorama() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    QVERIFY(window.markArea(squareAt(window.panorama())));
+    QCOMPARE(window.editsList()->count(), 1);
+    window.selectPhoto(2);
+    QCOMPARE(window.editsList()->count(), 0);
+    window.selectArea(0);
+    QCOMPARE(window.selectedArea(), -1);
+    window.showPanorama();
+    QCOMPARE(window.editsList()->count(), 1);
 }
 
 void StitcherTest::windowStitchesAndShowsThePanorama() {

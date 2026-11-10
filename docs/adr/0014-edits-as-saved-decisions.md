@@ -41,6 +41,14 @@ On the same panorama, Remove took about 0.3 to 0.5 s in a debug build. It remove
 car's rear from the road, and two of three repeated vans. An area at the far end of the street
 was refused, because fewer than 3 photos saw it.
 
+## Update: an edits panel
+
+An outline left on the panorama after an edit looked unfinished. So outlines are only drawn
+for the area being worked on, unless the user turns on **Show All Outlines**. A panel lists
+every edit, and each decision now records what was chosen (`kind`) and whether it's switched
+off (`hidden`), so the panel shows the same after stitching again. Unticking an edit keeps it
+but leaves it out, and dragging changes which edit lies on top.
+
 ## Results
 
 On a real panorama of 16,154 x 3,961 px, marking an area or changing its photo took about

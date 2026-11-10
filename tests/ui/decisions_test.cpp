@@ -43,8 +43,8 @@ QString write(const QTemporaryDir& folder, const QByteArray& content) {
 
 Decisions onePatch() {
     Decisions decisions;
-    decisions.patches.push_back(
-        Patch{{{1.5, 2.5}, {3.5, 2.5}, {3.5, -1.0}}, "photo 1.jpg", "fix the sign"});
+    decisions.patches.push_back(Patch{
+        {{1.5, 2.5}, {3.5, 2.5}, {3.5, -1.0}}, "photo 1.jpg", "fix the sign", "remove", true});
     return decisions;
 }
 
@@ -76,6 +76,8 @@ void DecisionsTest::writtenDecisionsReadBackTheSame() {
     QCOMPARE(patch.outline[2].arc, 3.5);
     QCOMPARE(patch.outline[2].height, -1.0);
     QCOMPARE(patch.note, std::string("fix the sign"));
+    QCOMPARE(patch.kind, std::string("remove"));
+    QVERIFY(patch.hidden);
 }
 
 void DecisionsTest::anAreaCanHoldJustADescription() {
