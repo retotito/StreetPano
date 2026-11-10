@@ -113,6 +113,17 @@ overrule them while the panorama is showing:
 | **Describe a Fix for the AI** | Saves your description with the area. The AI isn't built yet, so nothing changes for now |
 | **Cancel or Delete This Area** | Removes the outline, and your edit if you've made one |
 
+Finished edits show no outline, so the result looks clean. The **Edits** panel on the right
+lists every edit:
+
+- Click an edit to select it and zoom to it.
+- Untick an edit to switch it off without deleting it, which is handy for comparing before
+  and after.
+- Drag edits up or down. The lowest one is drawn on top.
+- Right-click an edit for the same choices as on the panorama.
+
+**Show All Outlines** in the toolbar outlines every edit at once.
+
 Undo and redo are in the toolbar too. You can zoom with the wheel, and pan by dragging with
 the right mouse button. To save the panorama with your edits, choose **File > Save Panorama**.
 

@@ -125,6 +125,19 @@ void PhotoView::setLassoMode(bool enabled) {
     update();
 }
 
+void PhotoView::showArea(const QRectF& imageArea) {
+    constexpr double kShare = 0.6;  // Leaves some of the surroundings in view.
+    if (image_.isNull() || imageArea.isEmpty()) {
+        return;
+    }
+    const double fit =
+        std::min(width() * kShare / imageArea.width(), height() * kShare / imageArea.height());
+    zoom_ = std::clamp(fit, std::min(fitZoom(), kMaxZoom), kMaxZoom);
+    offset_ = QPointF(width() / 2.0, height() / 2.0) - imageArea.center() * zoom_;
+    fitted_ = false;
+    update();
+}
+
 void PhotoView::setOutlines(std::vector<QPolygonF> outlines, int selected) {
     outlines_ = std::move(outlines);
     selectedOutline_ = selected;

@@ -4,6 +4,7 @@
 #include <QImage>
 #include <QLabel>
 #include <QListView>
+#include <QListWidget>
 #include <QMainWindow>
 #include <QMenu>
 #include <QPoint>
@@ -62,6 +63,14 @@ class MainWindow : public QMainWindow {
     bool describeFix(const QString& description);
     bool cancelOrDeleteArea();
     [[nodiscard]] bool hasPendingArea() const { return !pendingArea_.isEmpty(); }
+
+    // The edits panel lists every area, newest at the bottom, which is drawn on top.
+    void selectArea(int index);
+    bool setAreaHidden(int index, bool hidden);
+    bool moveArea(int from, int to);
+    void setOutlinesShown(bool shown);
+    [[nodiscard]] QListWidget* editsList() const { return editsList_; }
+    [[nodiscard]] QAction* showOutlinesAction() const { return showOutlinesAction_; }
     [[nodiscard]] QMenu* areaMenu() const { return areaMenu_; }
     [[nodiscard]] QString selectedAreaNote() const;
     [[nodiscard]] QString editMessage() const { return editMessage_; }
@@ -89,6 +98,7 @@ class MainWindow : public QMainWindow {
     [[nodiscard]] PhotoListModel* photoModel() const { return model_; }
     [[nodiscard]] QListView* filmStrip() const { return strip_; }
     [[nodiscard]] QString positionText() const { return positionLabel_->text(); }
+    [[nodiscard]] QString memoryText() const { return memoryLabel_->text(); }
     [[nodiscard]] std::size_t previewCacheUsedBytes() const { return previewCache_.usedBytes(); }
 
   private:
@@ -109,7 +119,10 @@ class MainWindow : public QMainWindow {
     void onAreaRightClicked(QPointF point, QPoint screenPoint);
     void askForFixDescription();
     [[nodiscard]] std::vector<core::WallPoint> targetOutline() const;
-    bool commitArea(std::string photo, const QString& message);
+    bool commitArea(std::string photo, const char* kind, const QString& message);
+    void refreshEditsList();
+    void onEditsRowMoved(int from, int to);
+    [[nodiscard]] QString describeArea(const core::Patch& patch) const;
     [[nodiscard]] std::vector<std::size_t> photoChoices(const core::Patch& patch) const;
     [[nodiscard]] QString findPosesFile() const;
 
@@ -136,6 +149,9 @@ class MainWindow : public QMainWindow {
     bool showingPanorama_ = false;
     QPolygonF pendingArea_;
     QMenu* areaMenu_ = nullptr;
+    QListWidget* editsList_ = nullptr;
+    QAction* showOutlinesAction_ = nullptr;
+    bool refreshingList_ = false;
     QAction* removeObjectAction_ = nullptr;
     QAction* keepObjectAction_ = nullptr;
     QAction* describeFixAction_ = nullptr;

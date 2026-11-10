@@ -213,7 +213,7 @@ QImage withPatches(const StitchResult& stitched, const QDir& photoFolder,
         std::max(2, static_cast<int>(std::ceil(stitched.photoSize.width() * stitched.scale))),
         std::max(2, static_cast<int>(std::ceil(stitched.photoSize.height() * stitched.scale))));
     for (const core::Patch& patch : patches) {
-        if (patch.photo.empty()) {
+        if (patch.photo.empty() || patch.hidden) {
             continue;
         }
         const auto pose = std::find_if(

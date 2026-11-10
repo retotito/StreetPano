@@ -1,14 +1,17 @@
 #include "ui/main_window.hpp"
 
+#include <QAbstractItemModel>
 #include <QAction>
 #include <QCursor>
 #include <QDir>
+#include <QDockWidget>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QInputDialog>
 #include <QItemSelectionModel>
 #include <QKeySequence>
+#include <QListWidgetItem>
 #include <QMenuBar>
 #include <QShortcut>
 #include <QSplitter>
@@ -159,6 +162,52 @@ MainWindow::MainWindow(std::size_t previewBudgetBytes, QWidget* parent)
     tools->addSeparator();
     tools->addAction(undoAction_);
     tools->addAction(redoAction_);
+
+    showOutlinesAction_ = editMenu->addAction(tr("Show &All Outlines"));
+    showOutlinesAction_->setCheckable(true);
+    showOutlinesAction_->setToolTip(tr("Outline every edit, not just the selected one"));
+    connect(showOutlinesAction_, &QAction::toggled, this, &MainWindow::setOutlinesShown);
+    tools->addSeparator();
+    tools->addAction(showOutlinesAction_);
+
+    // The edits panel, on the right.
+    auto* dock = makeChild<QDockWidget>(this, tr("Edits"));
+    dock->setObjectName(QStringLiteral("edits"));
+    dock->setFeatures(QDockWidget::DockWidgetMovable);
+    editsList_ = makeChild<QListWidget>(dock);
+    editsList_->setDragDropMode(QAbstractItemView::InternalMove);
+    editsList_->setContextMenuPolicy(Qt::CustomContextMenu);
+    editsList_->setToolTip(
+        tr("Tick to show an edit, untick to switch it off. Drag to change "
+           "which edit lies on top. Right-click for choices."));
+    dock->setWidget(editsList_);
+    constexpr int kPanelWidth = 320;
+    editsList_->setMinimumWidth(kPanelWidth);
+    addDockWidget(Qt::RightDockWidgetArea, dock);
+    connect(editsList_, &QListWidget::currentRowChanged, this, [this](int row) {
+        if (!refreshingList_) {
+            selectArea(row);
+        }
+    });
+    connect(editsList_, &QListWidget::itemChanged, this, [this](QListWidgetItem* item) {
+        if (!refreshingList_) {
+            setAreaHidden(editsList_->row(item), item->checkState() != Qt::Checked);
+        }
+    });
+    connect(editsList_->model(), &QAbstractItemModel::rowsMoved, this,
+            [this](const QModelIndex& /*parent*/, int start, int /*end*/,
+                   const QModelIndex& /*destination*/, int row) {
+                if (!refreshingList_) {
+                    onEditsRowMoved(start, row > start ? row - 1 : row);
+                }
+            });
+    connect(editsList_, &QListWidget::customContextMenuRequested, this, [this](QPoint point) {
+        const int row = editsList_->indexAt(point).row();
+        if (row >= 0) {
+            selectArea(row);
+            showAreaMenu(editsList_->viewport()->mapToGlobal(point));
+        }
+    });
 
     savePanoramaAction_ = fileMenu->addAction(tr("&Save Panorama"));
     savePanoramaAction_->setShortcut(QKeySequence::Save);
@@ -361,17 +410,123 @@ std::vector<std::size_t> MainWindow::photoChoices(const core::Patch& patch) cons
 }
 
 void MainWindow::redrawPanorama() {
+    // A finished edit should look finished, so only the one being worked on is outlined.
     std::vector<QPolygonF> outlines;
-    outlines.reserve(decisions_.patches.size());
-    for (const core::Patch& patch : decisions_.patches) {
-        outlines.push_back(toPanorama(patch.outline, stitched_.plan));
+    int highlighted = -1;
+    const bool all = showOutlinesAction_->isChecked();
+    for (std::size_t index = 0; index < decisions_.patches.size(); ++index) {
+        const bool selected = static_cast<int>(index) == selectedArea_;
+        if (all || selected) {
+            if (selected) {
+                highlighted = static_cast<int>(outlines.size());
+            }
+            outlines.push_back(toPanorama(decisions_.patches[index].outline, stitched_.plan));
+        }
     }
-    int highlighted = selectedArea_;
     if (!pendingArea_.isEmpty()) {
         outlines.push_back(pendingArea_);
         highlighted = static_cast<int>(outlines.size()) - 1;
     }
     view_->setOutlines(std::move(outlines), highlighted);
+    refreshEditsList();
+}
+
+QString MainWindow::describeArea(const core::Patch& patch) const {
+    QString text;
+    if (patch.kind == "remove") {
+        text = tr("Remove");
+    } else if (patch.kind == "keep") {
+        text = tr("Keep whole");
+    } else if (patch.photo.empty()) {
+        text = tr("For the AI");
+    } else {
+        text = tr("Filled from a photo");
+    }
+    if (!patch.photo.empty()) {
+        text += tr(" \u00b7 %1").arg(QFileInfo(QString::fromStdString(patch.photo)).baseName());
+    }
+    if (!patch.note.empty()) {
+        text += tr(" \u00b7 \u201c%1\u201d").arg(QString::fromStdString(patch.note));
+        if (patch.photo.empty()) {
+            text += tr(" (waiting, no AI yet)");
+        }
+    }
+    return text;
+}
+
+void MainWindow::refreshEditsList() {
+    refreshingList_ = true;
+    editsList_->clear();
+    if (showingPanorama_) {
+        for (std::size_t index = 0; index < decisions_.patches.size(); ++index) {
+            const core::Patch& patch = decisions_.patches[index];
+            auto* item = makeChild<QListWidgetItem>(
+                editsList_, QStringLiteral("%1. %2").arg(index + 1).arg(describeArea(patch)));
+            item->setFlags(item->flags() | Qt::ItemIsUserCheckable | Qt::ItemIsDragEnabled);
+            item->setCheckState(patch.hidden ? Qt::Unchecked : Qt::Checked);
+            item->setToolTip(item->text());
+        }
+        editsList_->setCurrentRow(selectedArea_);
+    }
+    refreshingList_ = false;
+}
+
+void MainWindow::setOutlinesShown(bool shown) {
+    if (showOutlinesAction_->isChecked() != shown) {
+        showOutlinesAction_->setChecked(shown);  // Calls this again through the signal.
+        return;
+    }
+    redrawPanorama();
+}
+
+void MainWindow::selectArea(int index) {
+    if (!showingPanorama_ || index < -1 || index >= areaCount()) {
+        return;
+    }
+    selectedArea_ = index;
+    pendingArea_.clear();
+    editMessage_.clear();
+    if (index >= 0) {
+        view_->showArea(
+            toPanorama(decisions_.patches[static_cast<std::size_t>(index)].outline, stitched_.plan)
+                .boundingRect());
+    }
+    redrawPanorama();
+    updateEditActions();
+    updateStatus();
+}
+
+bool MainWindow::setAreaHidden(int index, bool hidden) {
+    if (index < 0 || index >= areaCount() ||
+        decisions_.patches[static_cast<std::size_t>(index)].hidden == hidden) {
+        return false;
+    }
+    undoStack_.push_back(decisions_);
+    redoStack_.clear();
+    stitch::Decisions changed = decisions_;
+    changed.patches[static_cast<std::size_t>(index)].hidden = hidden;
+    applyDecisions(std::move(changed), index);
+    return true;
+}
+
+bool MainWindow::moveArea(int from, int to) {
+    if (from < 0 || to < 0 || from >= areaCount() || to >= areaCount() || from == to) {
+        return false;
+    }
+    undoStack_.push_back(decisions_);
+    redoStack_.clear();
+    stitch::Decisions changed = decisions_;
+    core::Patch moved = std::move(changed.patches[static_cast<std::size_t>(from)]);
+    changed.patches.erase(changed.patches.begin() + from);
+    changed.patches.insert(changed.patches.begin() + to, std::move(moved));
+    applyDecisions(std::move(changed), to);
+    return true;
+}
+
+void MainWindow::onEditsRowMoved(int from, int to) {
+    if (!moveArea(from, to)) {
+        refreshEditsList();
+    }
 }
 
 void MainWindow::applyDecisions(stitch::Decisions decisions, int selected) {
@@ -417,18 +572,21 @@ std::vector<core::WallPoint> MainWindow::targetOutline() const {
     return {};
 }
 
-bool MainWindow::commitArea(std::string photo, const QString& message) {
+bool MainWindow::commitArea(std::string photo, const char* kind, const QString& message) {
     const std::vector<core::WallPoint> outline = targetOutline();
     undoStack_.push_back(decisions_);
     redoStack_.clear();
     stitch::Decisions changed = decisions_;
     int selected = selectedArea_;
     if (!pendingArea_.isEmpty()) {
-        changed.patches.push_back(core::Patch{outline, std::move(photo), {}});
+        changed.patches.push_back(core::Patch{outline, std::move(photo), {}, kind, false});
         selected = static_cast<int>(changed.patches.size()) - 1;
         pendingArea_.clear();
     } else {
-        changed.patches[static_cast<std::size_t>(selected)].photo = std::move(photo);
+        core::Patch& patch = changed.patches[static_cast<std::size_t>(selected)];
+        patch.photo = std::move(photo);
+        patch.kind = kind;
+        patch.hidden = false;
     }
     applyDecisions(std::move(changed), selected);
     if (editMessage_.isEmpty()) {
@@ -450,7 +608,7 @@ bool MainWindow::removeObject() {
         updateStatus();
         return false;
     }
-    return commitArea(std::move(*photo),
+    return commitArea(std::move(*photo), "remove",
                       tr("Removed using the cleanest photo. Not right? Try a different photo."));
 }
 
@@ -467,7 +625,7 @@ bool MainWindow::keepObject() {
         updateStatus();
         return false;
     }
-    return commitArea(stitched_.poses[choices.front()].name,
+    return commitArea(stitched_.poses[choices.front()].name, "keep",
                       tr("Kept whole from one photo. Not right? Try a different photo."));
 }
 
@@ -481,7 +639,8 @@ bool MainWindow::describeFix(const QString& description) {
     stitch::Decisions changed = decisions_;
     int selected = selectedArea_;
     if (!pendingArea_.isEmpty()) {
-        changed.patches.push_back(core::Patch{outline, {}, description.trimmed().toStdString()});
+        changed.patches.push_back(
+            core::Patch{outline, {}, description.trimmed().toStdString(), "describe", false});
         selected = static_cast<int>(changed.patches.size()) - 1;
         pendingArea_.clear();
     } else {
@@ -553,6 +712,7 @@ bool MainWindow::markArea(const QPolygonF& outline) {
         return false;
     }
     patch.photo = stitched_.poses[choices.front()].name;
+    patch.kind = "keep";
     undoStack_.push_back(decisions_);
     redoStack_.clear();
     stitch::Decisions changed = decisions_;
@@ -636,6 +796,7 @@ void MainWindow::selectAreaAt(QPointF point) {
     }
     selectedArea_ = found;
     pendingArea_.clear();
+    editMessage_.clear();
     redrawPanorama();
     updateEditActions();
     updateStatus();
@@ -701,7 +862,9 @@ void MainWindow::showPhoto(int row) {
     currentRow_ = row;
     showingPanorama_ = false;
     pendingArea_.clear();
+    selectedArea_ = -1;
     view_->setOutlines({}, -1);
+    refreshEditsList();
     updateEditActions();
     previewLoader_->cancelPending();
     const std::optional<QImage> cached = previewCache_.get(row);
@@ -746,12 +909,19 @@ void MainWindow::updateStatus() {
     } else {
         positionLabel_->setText(tr("No photos open"));
     }
-    const double used = (static_cast<double>(previewCache_.usedBytes() + model_->cacheUsedBytes()) +
-                         static_cast<double>(panorama_.sizeInBytes())) /
-                        kBytesPerMegabyte;
+    // Previews have a budget. The panorama is shown on its own, because its size depends on the
+    // street, and the automatic result is kept apart from it once there are edits.
+    const double previews =
+        static_cast<double>(previewCache_.usedBytes() + model_->cacheUsedBytes()) /
+        kBytesPerMegabyte;
     const double budget =
         static_cast<double>(previewCache_.budgetBytes() + model_->cacheBudgetBytes()) /
         kBytesPerMegabyte;
+    double panoramaBytes = static_cast<double>(panorama_.sizeInBytes());
+    if (!stitched_.base.isNull() && stitched_.base.cacheKey() != panorama_.cacheKey()) {
+        panoramaBytes += static_cast<double>(stitched_.base.sizeInBytes());
+    }
+    const double panorama = panoramaBytes / kBytesPerMegabyte;
     if (stitchJob_ != nullptr && stitchJob_->total() > 0) {
         stitchMessage_ =
             tr("Stitching photo %1 of %2…").arg(stitchJob_->done()).arg(stitchJob_->total());
@@ -771,7 +941,12 @@ void MainWindow::updateStatus() {
                                 stitchMessage_);
     }
     memoryLabel_->setText(
-        tr("Image memory: %1 of %2 MB").arg(used, 0, 'f', 0).arg(budget, 0, 'f', 0));
+        panorama > 0.0
+            ? tr("Previews: %1 of %2 MB, panorama: %3 MB")
+                  .arg(previews, 0, 'f', 0)
+                  .arg(budget, 0, 'f', 0)
+                  .arg(panorama, 0, 'f', 0)
+            : tr("Previews: %1 of %2 MB").arg(previews, 0, 'f', 0).arg(budget, 0, 'f', 0));
 }
 
 }  // namespace streetpano::ui

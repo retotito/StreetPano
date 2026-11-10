@@ -23,8 +23,10 @@ struct WallPoint {
 // rather than in panorama pixels, so a decision survives a change of panorama size.
 struct Patch {
     std::vector<WallPoint> outline;
-    std::string photo;  // Empty means this area doesn't change the panorama.
-    std::string note;   // What the user wants done here, in their own words.
+    std::string photo;    // Empty means this area doesn't change the panorama.
+    std::string note;     // What the user wants done here, in their own words.
+    std::string kind;     // What the user chose: "remove", "keep" or "describe". Shown to them.
+    bool hidden = false;  // Switched off, but kept so it can be switched on again.
 };
 
 // Returns the photos that can supply an area, best first: those that see all of it, then the

@@ -13,6 +13,8 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- An edits panel that lists every edit, can switch one off and changes their order, and
+  outlines that disappear once an edit is finished
 - Mark an area on the panorama, then remove or keep what's in it from a menu, with undo and
   redo. Edits are saved as decisions, and your photos are never changed
 - Saving no longer risks a damaged panorama, and finding camera positions keeps your panorama

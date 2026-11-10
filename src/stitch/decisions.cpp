@@ -29,6 +29,8 @@ constexpr qsizetype kMinOutlinePoints = 3;
     core::Patch patch;
     patch.photo = photo.toStdString();
     patch.note = note.toStdString();
+    patch.kind = object.value(QStringLiteral("kind")).toString().toStdString();
+    patch.hidden = object.value(QStringLiteral("hidden")).toBool(false);
     patch.outline.reserve(static_cast<std::size_t>(outline.size()));
     for (qsizetype index = 0; index < outline.size(); ++index) {
         const QJsonArray point = outline.at(index).toArray();
@@ -103,6 +105,12 @@ bool writeDecisions(const Decisions& decisions, const QString& path) {
                            {QStringLiteral("outline"), outline}};
         if (!patch.note.empty()) {
             object.insert(QStringLiteral("note"), QString::fromStdString(patch.note));
+        }
+        if (!patch.kind.empty()) {
+            object.insert(QStringLiteral("kind"), QString::fromStdString(patch.kind));
+        }
+        if (patch.hidden) {
+            object.insert(QStringLiteral("hidden"), true);
         }
         patches.append(object);
     }
