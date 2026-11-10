@@ -3,8 +3,11 @@
 #include <QApplication>
 #include <QImage>
 #include <QMouseEvent>
+#include <QNativeGestureEvent>
+#include <QPointingDevice>
 #include <QPolygonF>
 #include <QSignalSpy>
+#include <QWheelEvent>
 #include <QtTest>
 #include <utility>
 #include <vector>
@@ -21,6 +24,8 @@ class PhotoViewTest : public QObject {
     void aClickReportsItsImagePoint();
     void aDragIsNotAClick();
     void aRightClickReportsItsImagePoint();
+    void aTrackpadMovesTheView();
+    void pinchingZooms();
     void outlinesAreDrawnOverTheImage();
     void startsEmptyWithAMessage();
     void fitsAnImageInsideTheWidget();
@@ -267,6 +272,41 @@ void PhotoViewTest::aRightClickReportsItsImagePoint() {
     QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, QPoint(10, 20));
     QCOMPARE(clicked.count(), 1);
     QCOMPARE(clicked.at(0).at(0).toPointF(), QPointF(20.0, 40.0));
+}
+
+void PhotoViewTest::aTrackpadMovesTheView() {
+    PhotoView view;
+    view.resize(400, 200);
+    QImage image(1600, 400, QImage::Format_RGB32);
+    image.fill(Qt::gray);
+    view.setImage(image);
+    view.zoomAround(QPointF(200, 100), 4.0);
+    const double zoom = view.zoom();
+    const QPointF before = view.offset();
+    QWheelEvent scroll(QPointF(200, 100), view.mapToGlobal(QPointF(200, 100)), QPoint(-30, 10),
+                       QPoint(-90, 30), Qt::NoButton, Qt::NoModifier, Qt::ScrollUpdate, false);
+    QApplication::sendEvent(&view, &scroll);
+    QCOMPARE(view.zoom(), zoom);
+    QCOMPARE(view.offset(), before + QPointF(-30, 10));
+}
+
+void PhotoViewTest::pinchingZooms() {
+    PhotoView view;
+    view.resize(400, 200);
+    QImage image(1600, 400, QImage::Format_RGB32);
+    image.fill(Qt::gray);
+    view.setImage(image);
+    const double fitted = view.zoom();
+    QNativeGestureEvent pinch(Qt::ZoomNativeGesture, QPointingDevice::primaryPointingDevice(), 2,
+                              QPointF(200, 100), QPointF(200, 100),
+                              view.mapToGlobal(QPointF(200, 100)), 0.5, QPointF());
+    QApplication::sendEvent(&view, &pinch);
+    QCOMPARE(view.zoom(), fitted * 1.5);
+    QNativeGestureEvent other(Qt::RotateNativeGesture, QPointingDevice::primaryPointingDevice(), 2,
+                              QPointF(200, 100), QPointF(200, 100),
+                              view.mapToGlobal(QPointF(200, 100)), 0.5, QPointF());
+    QApplication::sendEvent(&view, &other);
+    QCOMPARE(view.zoom(), fitted * 1.5);
 }
 
 void PhotoViewTest::outlinesAreDrawnOverTheImage() {

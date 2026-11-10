@@ -65,6 +65,8 @@ class StitcherTest : public QObject {
     void theAreaMenuOffersTheChoices();
     void rightClickSelectsAnArea();
     void tooFewPhotosCantRemove();
+    void severalAreasCanBeDescribedInARow();
+    void escapeStopsMarkingThenCancels();
     void finishedEditsAreNotOutlined();
     void theEditsPanelListsEveryEdit();
     void selectingInThePanelSelectsTheArea();
@@ -548,9 +550,11 @@ void StitcherTest::anOutlineChangesNothingUntilAChoiceIsMade() {
     QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
     const QImage before = window.panorama();
     window.markAreaAction()->setChecked(true);
+    QVERIFY(window.editMessage().contains(QStringLiteral("Esc")));
     window.beginArea(squareAt(before));
     QVERIFY(window.hasPendingArea());
-    QVERIFY(!window.markAreaAction()->isChecked());  // The next drag moves the view again.
+    // Marking stays on, so several objects can be outlined one after another.
+    QVERIFY(window.markAreaAction()->isChecked());
     QCOMPARE(window.areaCount(), 0);
     QCOMPARE(window.panorama(), before);
     QVERIFY(!QFile::exists(window.decisionsPath()));
@@ -848,6 +852,40 @@ void StitcherTest::thePanelIsEmptyAwayFromThePanorama() {
     QCOMPARE(window.selectedArea(), -1);
     window.showPanorama();
     QCOMPARE(window.editsList()->count(), 1);
+}
+
+void StitcherTest::severalAreasCanBeDescribedInARow() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    window.markAreaAction()->setChecked(true);
+    for (int round = 1; round <= 3; ++round) {
+        emit window.photoView()->lassoFinished(squareAt(window.panorama(), 10 * round));
+        QVERIFY(window.markAreaAction()->isChecked());
+        QVERIFY(window.describeFix(QStringLiteral("note %1").arg(round)));
+        window.areaMenu()->hide();
+    }
+    QCOMPARE(window.areaCount(), 3);
+    QCOMPARE(readDecisions(window.decisionsPath()).decisions->patches[2].note,
+             std::string("note 3"));
+}
+
+void StitcherTest::escapeStopsMarkingThenCancels() {
+    const Street street;
+    MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    window.markAreaAction()->setChecked(true);
+    window.beginArea(squareAt(window.panorama()));
+    QTest::keyClick(&window, Qt::Key_Escape);
+    QVERIFY(!window.markAreaAction()->isChecked());
+    QVERIFY(window.hasPendingArea());
+    QTest::keyClick(&window, Qt::Key_Escape);
+    QVERIFY(!window.hasPendingArea());
+    QTest::keyClick(&window, Qt::Key_Escape);  // Nothing left to stop.
 }
 
 void StitcherTest::windowStitchesAndShowsThePanorama() {

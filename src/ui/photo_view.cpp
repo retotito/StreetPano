@@ -1,6 +1,7 @@
 #include "ui/photo_view.hpp"
 
 #include <QMouseEvent>
+#include <QNativeGestureEvent>
 #include <QPainter>
 #include <QPen>
 #include <QRectF>
@@ -110,10 +111,30 @@ void PhotoView::resizeEvent(QResizeEvent* /*event*/) {
 }
 
 void PhotoView::wheelEvent(QWheelEvent* event) {
+    // A trackpad reports exact pixels and moves the view, as elsewhere on a Mac. A mouse wheel
+    // reports notches and zooms, which is quicker along a long panorama.
+    if (!event->pixelDelta().isNull() && !image_.isNull()) {
+        offset_ += QPointF(event->pixelDelta());
+        fitted_ = false;
+        update();
+        event->accept();
+        return;
+    }
     constexpr double kNotchesPerDegree = 1.0 / 120.0;
     const double notches = event->angleDelta().y() * kNotchesPerDegree;
     zoomAround(event->position(), std::pow(1.25, notches));
     event->accept();
+}
+
+bool PhotoView::event(QEvent* event) {
+    if (event->type() == QEvent::NativeGesture) {
+        const auto* gesture = static_cast<QNativeGestureEvent*>(event);
+        if (gesture->gestureType() == Qt::ZoomNativeGesture) {
+            zoomAround(gesture->position(), 1.0 + gesture->value());
+            return true;
+        }
+    }
+    return QWidget::event(event);
 }
 
 QPointF PhotoView::toImage(QPointF widgetPoint) const { return (widgetPoint - offset_) / zoom_; }
