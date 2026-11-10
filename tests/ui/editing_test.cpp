@@ -43,6 +43,8 @@ using streetpano::ui::StitchJob;
 
 // Editing the panorama in the window: marking areas, the menu and the edits panel. These are
 // apart from the stitcher tests so that each program stays well within CI's time limit.
+namespace stitch = streetpano::stitch;
+
 class EditingTest : public QObject {
     Q_OBJECT
 
@@ -57,6 +59,9 @@ class EditingTest : public QObject {
     void alignShowsThePhotosSideBySide();
     void guidesAreAddedMovedAndRemoved();
     void alignWithoutCameraPositionsExplainsWhatToDo();
+    void aPhotoIsSelectedAndCorrected();
+    void theOriginalPhotosCanBeCompared();
+    void correctionsAreUsedWhenStitching();
     void markingAnAreaSavesADecision();
     void editsCanBeUndoneAndRedone();
     void changingAPhotoStepsThroughTheChoices();
@@ -854,6 +859,92 @@ void EditingTest::alignWithoutCameraPositionsExplainsWhatToDo() {
     window.setStep(MainWindow::Step::Align);
     QVERIFY(!window.isPreparingAlignment());
     QVERIFY(window.alignView()->message().contains(QStringLiteral("stitch.sh")));
+}
+
+void EditingTest::aPhotoIsSelectedAndCorrected() {
+    const Street street;
+    MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QVERIFY(window.openFolder(street.folder.path()));
+    window.setStep(MainWindow::Step::Align);
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isPreparingAlignment(), 30000);
+    QVERIFY(!window.rotateSelected(1.0));  // Nothing is selected.
+    // Clicking a photo selects it, and clicking a gap selects nothing.
+    const auto& tile = window.alignmentView().tiles[2];
+    emit window.alignView()->imageClicked(QPointF(tile.left + 5.0, 50.0));
+    QCOMPARE(window.selectedTile(), 2);
+    QCOMPARE(window.alignView()->outlineCount(), std::size_t{1});
+    QVERIFY(window.positionText().contains(QStringLiteral("Photo 3 of")));
+    const QImage before = window.alignView()->image();
+    QVERIFY(window.rotateSelected(0.2));
+    QVERIFY(window.tiltSelected(0.2));
+    QVERIFY(window.moveSelected(2.0));
+    QVERIFY(window.scaleSelected(1.005));
+    QVERIFY(window.alignView()->image() != before);
+    const auto adjustment = window.selectedAdjustment();
+    QCOMPARE(adjustment.rollDegrees, 0.2);
+    QCOMPARE(adjustment.pitchDegrees, 0.2);
+    QVERIFY(adjustment.shift > 0.0);
+    QCOMPARE(adjustment.scale, 1.005);
+    // Saved, and back to the automatic result after a reset.
+    QCOMPARE(stitch::readAlignment(window.alignmentPath()).alignment->photos.size(),
+             std::size_t{1});
+    QVERIFY(window.resetSelected());
+    QVERIFY(window.selectedAdjustment().isNeutral());
+    QVERIFY(stitch::readAlignment(window.alignmentPath()).alignment->photos.empty());
+    // The arrow keys select the next photo and move the selected one.
+    window.alignView()->setFocus();
+    QTest::keyClick(window.alignView(), Qt::Key_Right);
+    QCOMPARE(window.selectedTile(), 3);
+    QTest::keyClick(window.alignView(), Qt::Key_Left);
+    QCOMPARE(window.selectedTile(), 2);
+    QTest::keyClick(window.alignView(), Qt::Key_Up);
+    QVERIFY(window.selectedAdjustment().shift > 0.0);
+    QTest::keyClick(window.alignView(), Qt::Key_Down);
+    QVERIFY(std::abs(window.selectedAdjustment().shift) < 1e-12);
+    emit window.alignView()->imageClicked(QPointF(tile.left - 3.0, 50.0));
+    QCOMPARE(window.selectedTile(), -1);
+    QCOMPARE(window.alignView()->outlineCount(), std::size_t{0});
+    QVERIFY(QFile::remove(window.alignmentPath()));
+}
+
+void EditingTest::theOriginalPhotosCanBeCompared() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(window.openFolder(street.folder.path()));
+    window.setStep(MainWindow::Step::Align);
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isPreparingAlignment(), 30000);
+    QVERIFY(window.addGuide());
+    window.setOriginalShown(true);
+    QVERIFY(window.isOriginalShown());
+    QCOMPARE(window.alignView()->image(), window.alignmentView().original);
+    QVERIFY(window.alignView()->guides().empty());  // Guides only mean something when corrected.
+    // Correcting a photo switches back to the corrected view.
+    window.selectTile(1);
+    QVERIFY(window.moveSelected(2.0));
+    QVERIFY(!window.isOriginalShown());
+    QCOMPARE(window.alignView()->guides().size(), std::size_t{1});
+    QVERIFY(QFile::remove(window.alignmentPath()));
+}
+
+void EditingTest::correctionsAreUsedWhenStitching() {
+    const Street street;
+    MainWindow window;
+    QVERIFY(stitchInWindow(window, street));
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    const QImage plain = window.panorama();
+    window.setStep(MainWindow::Step::Align);
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isPreparingAlignment(), 30000);
+    window.selectTile(5);
+    for (int step = 0; step < 10; ++step) {
+        QVERIFY(window.rotateSelected(0.2));
+    }
+    QVERIFY(window.editMessage().contains(QStringLiteral("Stitch again")));
+    QVERIFY(window.startStitchFromFolder());
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isStitching(), 30000);
+    QVERIFY(window.panorama() != plain);
+    QVERIFY(QFile::remove(window.alignmentPath()));
 }
 
 QTEST_MAIN(EditingTest)

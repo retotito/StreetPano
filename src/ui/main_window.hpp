@@ -11,6 +11,7 @@
 #include <QPoint>
 #include <QPointF>
 #include <QPolygonF>
+#include <QShortcut>
 #include <QStackedWidget>
 #include <QString>
 #include <QToolBar>
@@ -67,6 +68,19 @@ class MainWindow : public QMainWindow {
     [[nodiscard]] PhotoView* alignView() const { return alignView_; }
     [[nodiscard]] std::size_t guideCount() const { return alignment_.guides.size(); }
     [[nodiscard]] QString alignmentPath() const { return alignmentPath_; }
+    // Selecting and correcting one photo. The correction is saved at once, and the next stitch
+    // uses it. -1 selects nothing.
+    void selectTile(int tile);
+    [[nodiscard]] int selectedTile() const { return selectedTile_; }
+    [[nodiscard]] core::PhotoAdjustment selectedAdjustment() const;
+    bool rotateSelected(double degrees);
+    bool tiltSelected(double degrees);
+    bool moveSelected(double rows);
+    bool scaleSelected(double factor);
+    bool resetSelected();
+    // Shows the photos as they were taken, to compare with the corrected view.
+    void setOriginalShown(bool shown);
+    [[nodiscard]] bool isOriginalShown() const { return originalShown_; }
     bool addGuide();
     bool moveGuide(int index, double row);
     bool removeGuide(int index);
@@ -154,6 +168,9 @@ class MainWindow : public QMainWindow {
     void onAlignmentFinished();
     void showGuides();
     void saveGuides();
+    bool adjustSelected(const core::PhotoAdjustment& change);
+    void showSelectedTile();
+    void updateAlignActions();
     [[nodiscard]] bool isStepAvailable(Step step) const;
     [[nodiscard]] QWidget* createProjectsPage();
     [[nodiscard]] QWidget* createExportPage();
@@ -221,6 +238,13 @@ class MainWindow : public QMainWindow {
     stitch::Alignment alignment_;
     QString alignmentPath_;
     QAction* showGridAction_ = nullptr;
+    QAction* showOriginalAction_ = nullptr;
+    std::vector<QAction*> adjustActions_;
+    stitch::PreparedStreet alignStreet_;
+    int selectedTile_ = -1;
+    bool originalShown_ = false;
+    QShortcut* nextShortcut_ = nullptr;
+    QShortcut* previousShortcut_ = nullptr;
     QToolBar* editTools_ = nullptr;
     QDockWidget* editsDock_ = nullptr;
     QPolygonF pendingArea_;

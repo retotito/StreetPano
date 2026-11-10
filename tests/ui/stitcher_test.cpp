@@ -55,6 +55,9 @@ class StitcherTest : public QObject {
     void aHeightIsTheSameRowInEveryPhoto();
     void aStreetThatCantBePreparedSaysWhy();
     void guidesAreSavedAndReadBack();
+    void correctionsAreSavedAndReadBack();
+    void correctionsChangeTheStitch();
+    void aTileCanBeRedrawnWithACorrection();
     void damagedGuidesAreRefused();
     void aPatchWithAnUnknownPhotoGivesAWarning();
     void aPatchWithAMissingPhotoGivesAWarning();
@@ -433,10 +436,77 @@ void StitcherTest::guidesAreSavedAndReadBack() {
     const auto missing = streetpano::stitch::readAlignment(path);
     QVERIFY(missing.alignment.has_value());
     QVERIFY(missing.alignment->guides.empty());
-    QVERIFY(streetpano::stitch::writeAlignment({{1.5, -2.25}}, path));
+    QVERIFY(streetpano::stitch::writeAlignment({{1.5, -2.25}, {}}, path));
     const auto read = streetpano::stitch::readAlignment(path);
     QCOMPARE(read.alignment->guides, (std::vector<double>{1.5, -2.25}));
     QVERIFY(!streetpano::stitch::writeAlignment({}, folder.filePath(QStringLiteral("no/a.json"))));
+}
+
+void StitcherTest::correctionsAreSavedAndReadBack() {
+    const QTemporaryDir folder;
+    const QString path = folder.filePath(QStringLiteral("alignment.json"));
+    streetpano::stitch::Alignment alignment;
+    alignment.photos["003.png"] = {1.5, -0.4, 0.25, 1.02};
+    alignment.photos["004.png"] = {};  // Neutral, so it isn't written.
+    QVERIFY(streetpano::stitch::writeAlignment(alignment, path));
+    const auto read = streetpano::stitch::readAlignment(path);
+    QVERIFY(read.alignment.has_value());
+    QCOMPARE(read.alignment->photos.size(), std::size_t{1});
+    const auto adjustment = read.alignment->adjustmentFor("003.png");
+    QCOMPARE(adjustment.rollDegrees, 1.5);
+    QCOMPARE(adjustment.pitchDegrees, -0.4);
+    QCOMPARE(adjustment.shift, 0.25);
+    QCOMPARE(adjustment.scale, 1.02);
+    QVERIFY(read.alignment->adjustmentFor("009.png").isNeutral());
+    // Impossible corrections are refused.
+    for (const QByteArray& photo :
+         {QByteArray(R"("a.png": {"scale": 0})"), QByteArray(R"("a.png": {"roll_degrees": 90})"),
+          QByteArray(R"("../a.png": {"shift": 1})")}) {
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        file.write(R"({"format_version": 1, "guides": [], "photos": {)" + photo + "}}");
+        file.close();
+        QVERIFY(!streetpano::stitch::readAlignment(path).alignment.has_value());
+    }
+}
+
+void StitcherTest::correctionsChangeTheStitch() {
+    const Street street;
+    const auto plain = stitchPanorama(street.poses(), QDir(street.folder.path()));
+    streetpano::stitch::Alignment alignment;
+    alignment.photos["005.png"] = {3.0, 0.0, 0.0, 1.0};
+    const auto corrected =
+        stitchPanorama(street.poses(), QDir(street.folder.path()), {}, {}, nullptr, &alignment);
+    QVERIFY(corrected.error.isEmpty());
+    QVERIFY(corrected.panorama != plain.panorama);
+    // Only the corrected photo moved. The wall comes from the original positions.
+    QCOMPARE(corrected.surface.medianCameraDistance, plain.surface.medianCameraDistance);
+}
+
+void StitcherTest::aTileCanBeRedrawnWithACorrection() {
+    const Street street;
+    const auto prepared =
+        streetpano::stitch::prepareStreet(street.poses(), QDir(street.folder.path()));
+    auto view = streetpano::stitch::buildAlignmentView(prepared, QDir(street.folder.path()), 120);
+    QVERIFY(!view.original.isNull());
+    QCOMPARE(view.original.size(), view.strip.size());
+    const QImage before = view.strip.copy();
+    streetpano::stitch::redrawTile(view, prepared, QDir(street.folder.path()), 4,
+                                   {0.0, 0.0, 10.0 * view.unitsPerPixel, 1.0});
+    const auto& tile = view.tiles[4];
+    QVERIFY(view.strip.copy(tile.left, 0, tile.width, 120) !=
+            before.copy(tile.left, 0, tile.width, 120));
+    // Its neighbours aren't touched.
+    const auto& next = view.tiles[5];
+    QCOMPARE(view.strip.copy(next.left, 0, next.width, 120),
+             before.copy(next.left, 0, next.width, 120));
+    // Redrawing without a correction gives the original tile again.
+    streetpano::stitch::redrawTile(view, prepared, QDir(street.folder.path()), 4, {});
+    QCOMPARE(view.strip, before);
+    streetpano::stitch::redrawTile(view, prepared, QDir(street.folder.path()), 99, {});  // Ignored.
+    QCOMPARE(streetpano::stitch::tileAt(view, tile.left + 1.0), 4);
+    QCOMPARE(streetpano::stitch::tileAt(view, tile.left - 2.0), -1);  // The gap.
+    QCOMPARE(streetpano::stitch::tileAt(view, -5.0), -1);
 }
 
 void StitcherTest::damagedGuidesAreRefused() {

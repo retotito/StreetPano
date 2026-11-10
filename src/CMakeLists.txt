@@ -1,5 +1,7 @@
 add_library(streetpano_core STATIC
     core/lru_cache.hpp
+    core/photo_adjustment.cpp
+    core/photo_adjustment.hpp
     core/photo_listing.cpp
     core/photo_listing.hpp
     core/patch.cpp

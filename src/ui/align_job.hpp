@@ -34,6 +34,8 @@ class AlignJob : public QObject {
 
     // Valid after finished has been emitted.
     [[nodiscard]] stitch::AlignmentView takeView();
+    [[nodiscard]] stitch::PreparedStreet takeStreet();
+    [[nodiscard]] stitch::Alignment takeAlignment();
 
   signals:
     // Both are always emitted on the owner's thread, so they're safe to connect directly.
@@ -57,6 +59,8 @@ class AlignJob : public QObject {
 
     std::mutex mutex_;
     stitch::AlignmentView view_;
+    stitch::PreparedStreet street_;
+    stitch::Alignment alignment_;
 
     std::optional<std::thread> worker_;
 };
