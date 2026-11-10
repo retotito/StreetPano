@@ -99,13 +99,14 @@ void PhotoView::paintEvent(QPaintEvent* /*event*/) {
     const QRectF shown(offset_, QSizeF(image_.size()) * zoom_);
     if (gridSpacing_ > 0.0) {
         painter.setPen(QPen(QColor(255, 255, 255, 45), 1.0));
-        for (double y = 0.0; y < image_.height(); y += gridSpacing_) {
-            painter.drawLine(QPointF(shown.left(), offset_.y() + y * zoom_),
-                             QPointF(shown.right(), offset_.y() + y * zoom_));
+        // Counting lines, rather than adding up spacing, keeps rounding from creeping in.
+        for (int line = 0; line * gridSpacing_ < image_.height(); ++line) {
+            const double y = offset_.y() + line * gridSpacing_ * zoom_;
+            painter.drawLine(QPointF(shown.left(), y), QPointF(shown.right(), y));
         }
-        for (double x = 0.0; x < image_.width(); x += gridSpacing_) {
-            painter.drawLine(QPointF(offset_.x() + x * zoom_, shown.top()),
-                             QPointF(offset_.x() + x * zoom_, shown.bottom()));
+        for (int line = 0; line * gridSpacing_ < image_.width(); ++line) {
+            const double x = offset_.x() + line * gridSpacing_ * zoom_;
+            painter.drawLine(QPointF(x, shown.top()), QPointF(x, shown.bottom()));
         }
     }
     for (std::size_t index = 0; index < guides_.size(); ++index) {

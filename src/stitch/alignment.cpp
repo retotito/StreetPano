@@ -18,7 +18,7 @@ constexpr int kGapPixels = 12;
 constexpr double kSharpness = 1.5;  // Photos are read a little larger than shown, to stay sharp.
 constexpr int kFormatVersion = 1;
 constexpr qint64 kMaxFileBytes = qint64{4} * 1024 * 1024;
-const QRgb kGapColour = qRgb(32, 34, 37);
+constexpr QRgb kGapColour = qRgb(32, 34, 37);
 
 [[nodiscard]] QString photoPath(const QDir& folder, const core::CameraPose& pose) {
     return folder.filePath(QString::fromStdString(pose.name));
@@ -188,7 +188,9 @@ AlignmentResult readAlignment(const QString& path) {
         return result;
     }
     Alignment alignment;
-    for (const QJsonValue& guide : root.value(QStringLiteral("guides")).toArray()) {
+    const QJsonArray saved = root.value(QStringLiteral("guides")).toArray();
+    for (qsizetype index = 0; index < saved.size(); ++index) {
+        const QJsonValue guide = saved.at(index);
         if (!guide.isDouble() || !std::isfinite(guide.toDouble())) {
             result.error = QStringLiteral("%1 isn't a valid alignment.").arg(path);
             return result;
