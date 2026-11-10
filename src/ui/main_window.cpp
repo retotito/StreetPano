@@ -2,6 +2,7 @@
 
 #include <QAbstractItemModel>
 #include <QAction>
+#include <QActionGroup>
 #include <QCursor>
 #include <QDir>
 #include <QDockWidget>
@@ -18,6 +19,7 @@
 #include <QStatusBar>
 #include <QToolBar>
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <filesystem>
 #include <optional>
@@ -175,6 +177,30 @@ MainWindow::MainWindow(std::size_t previewBudgetBytes, QWidget* parent)
     tools->addSeparator();
     tools->addAction(undoAction_);
     tools->addAction(redoAction_);
+
+    // What a drag draws: a freehand outline, a rectangle, or a line.
+    auto* shapes = makeChild<QActionGroup>(this);
+    QMenu* shapeMenu = editMenu->addMenu(tr("Mark &Shape"));
+    const auto addShape = [this, shapes, shapeMenu](const QString& name, const QString& tip,
+                                                    PhotoView::MarkShape shape) {
+        QAction* action = shapeMenu->addAction(name);
+        action->setCheckable(true);
+        action->setToolTip(tip);
+        shapes->addAction(action);
+        connect(action, &QAction::triggered, this, [this, shape] { setMarkShape(shape); });
+        return action;
+    };
+    freehandAction_ =
+        addShape(tr("Freehand"), tr("Draw around an object"), PhotoView::MarkShape::Freehand);
+    rectangleAction_ = addShape(tr("Rectangle"), tr("Drag from one corner to the opposite one"),
+                                PhotoView::MarkShape::Rectangle);
+    lineAction_ =
+        addShape(tr("Line"), tr("Drag along something that should be straight, then describe it"),
+                 PhotoView::MarkShape::Line);
+    freehandAction_->setChecked(true);
+    tools->insertAction(tools->actions().value(1), freehandAction_);
+    tools->insertAction(tools->actions().value(2), rectangleAction_);
+    tools->insertAction(tools->actions().value(3), lineAction_);
 
     showOutlinesAction_ = editMenu->addAction(tr("Show &All Outlines"));
     showOutlinesAction_->setCheckable(true);
@@ -446,7 +472,9 @@ void MainWindow::redrawPanorama() {
 
 QString MainWindow::describeArea(const core::Patch& patch) const {
     QString text;
-    if (patch.kind == "remove") {
+    if (patch.outline.size() == 2) {
+        text = tr("Line");
+    } else if (patch.kind == "remove") {
         text = tr("Remove");
     } else if (patch.kind == "keep") {
         text = tr("Keep whole");
@@ -562,13 +590,49 @@ void MainWindow::applyDecisions(stitch::Decisions decisions, int selected) {
     updateStatus();
 }
 
+void MainWindow::setMarkShape(PhotoView::MarkShape shape) {
+    view_->setMarkShape(shape);
+    freehandAction_->setChecked(shape == PhotoView::MarkShape::Freehand);
+    rectangleAction_->setChecked(shape == PhotoView::MarkShape::Rectangle);
+    lineAction_->setChecked(shape == PhotoView::MarkShape::Line);
+    if (markAreaAction_->isEnabled()) {
+        markAreaAction_->setChecked(true);
+    }
+}
+
+bool MainWindow::isTargetALine() const {
+    if (!pendingArea_.isEmpty()) {
+        return pendingArea_.size() == 2;
+    }
+    return selectedArea_ >= 0 &&
+           decisions_.patches[static_cast<std::size_t>(selectedArea_)].outline.size() == 2;
+}
+
+bool MainWindow::hits(const QPolygonF& outline, QPointF point) const {
+    if (outline.size() != 2) {
+        return outline.containsPoint(point, Qt::OddEvenFill);
+    }
+    // A line has no inside, so a click near it counts.
+    constexpr double kReachScreenPixels = 8.0;
+    const double reach = kReachScreenPixels / std::max(view_->zoom(), 1e-9);
+    const QPointF start = outline.at(0);
+    const QPointF along = outline.at(1) - start;
+    const double length2 = QPointF::dotProduct(along, along);
+    const double share =
+        length2 > 0.0 ? std::clamp(QPointF::dotProduct(point - start, along) / length2, 0.0, 1.0)
+                      : 0.0;
+    const QPointF nearest = start + along * share;
+    return std::hypot(point.x() - nearest.x(), point.y() - nearest.y()) <= reach;
+}
+
 void MainWindow::beginArea(const QPolygonF& outline) {
-    if (!showingPanorama_ || panorama_.isNull() || outline.size() < 3) {
+    if (!showingPanorama_ || panorama_.isNull() || outline.size() < 2) {
         return;
     }
     pendingArea_ = outline;
     selectedArea_ = -1;
-    editMessage_ = tr("Choose what to do with this area.");
+    editMessage_ = outline.size() == 2 ? tr("Describe what's wrong along this line.")
+                                       : tr("Choose what to do with this area.");
     redrawPanorama();
     updateEditActions();
     updateStatus();
@@ -610,8 +674,8 @@ bool MainWindow::commitArea(std::string photo, const char* kind, const QString& 
 
 bool MainWindow::removeObject() {
     const std::vector<core::WallPoint> outline = targetOutline();
-    if (outline.empty()) {
-        return false;
+    if (outline.size() < 3) {
+        return false;  // Nothing marked, or a line, which has no area to fill.
     }
     std::optional<std::string> photo =
         stitch::cleanestPhoto(stitched_, QDir(currentFolder_), outline);
@@ -626,7 +690,7 @@ bool MainWindow::removeObject() {
 
 bool MainWindow::keepObject() {
     const std::vector<core::WallPoint> outline = targetOutline();
-    if (outline.empty()) {
+    if (outline.size() < 3) {
         return false;
     }
     core::Patch patch;
@@ -699,7 +763,7 @@ void MainWindow::onAreaRightClicked(QPointF point, QPoint screenPoint) {
     if (!showingPanorama_) {
         return;
     }
-    if (pendingArea_.isEmpty() || !pendingArea_.containsPoint(point, Qt::OddEvenFill)) {
+    if (pendingArea_.isEmpty() || !hits(pendingArea_, point)) {
         pendingArea_.clear();
         selectAreaAt(point);
     }
@@ -802,7 +866,7 @@ void MainWindow::selectAreaAt(QPointF point) {
     // The newest area is drawn on top, so it's found first.
     for (int index = areaCount() - 1; index >= 0 && found < 0; --index) {
         const core::Patch& patch = decisions_.patches[static_cast<std::size_t>(index)];
-        if (toPanorama(patch.outline, stitched_.plan).containsPoint(point, Qt::OddEvenFill)) {
+        if (hits(toPanorama(patch.outline, stitched_.plan), point)) {
             found = index;
         }
     }
@@ -848,11 +912,12 @@ void MainWindow::updateEditActions() {
     }
     const bool selected = canEdit && selectedArea_ >= 0;
     const bool target = canEdit && (selected || hasPendingArea());
-    removeObjectAction_->setEnabled(target);
-    keepObjectAction_->setEnabled(target);
+    const bool area = target && !isTargetALine();
+    removeObjectAction_->setEnabled(area);
+    keepObjectAction_->setEnabled(area);
     describeFixAction_->setEnabled(target);
-    nextAreaPhotoAction_->setEnabled(selected);
-    previousAreaPhotoAction_->setEnabled(selected);
+    nextAreaPhotoAction_->setEnabled(selected && area);
+    previousAreaPhotoAction_->setEnabled(selected && area);
     deleteAreaAction_->setEnabled(target);
     undoAction_->setEnabled(canEdit && !undoStack_.empty());
     redoAction_->setEnabled(canEdit && !redoStack_.empty());

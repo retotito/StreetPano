@@ -100,9 +100,11 @@ folder to start again, which also deletes your edits. Your original photos are n
 Seams go around most objects by themselves, but they can also remove or repeat them. To
 overrule them while the panorama is showing:
 
-1. Click **Mark an Area** in the toolbar, and drag an outline around the object. Nothing
-   changes yet. Marking stays on, so you can outline the next object straight away. Press
-   ++esc++ to stop marking.
+1. Click **Mark an Area** in the toolbar, and drag an outline around the object. Next to it,
+   choose **Freehand**, **Rectangle** (drag from corner to corner) or **Line** (drag along
+   something that should be straight). A line can only be described, because it has no area
+   to fill. Nothing changes yet. Marking stays on, so you can outline the next object
+   straight away. Press ++esc++ to stop marking.
 2. A menu opens by itself. You can also right-click an outline at any time to open it.
 3. Choose what should happen:
 
@@ -130,8 +132,7 @@ zoom. With a mouse, the wheel zooms. While marking, drag with the right mouse bu
 around. To save the panorama with your edits, choose **File > Save Panorama**.
 
 Your edits are saved straight away in `decisions.json`, in the `.streetpano` folder, and come
-back when you stitch again. They contain no pixels, and your photos are never changed. Zoom
-with the wheel. While marking, pan with the right mouse button.
+back when you stitch again. They contain no pixels, and your photos are never changed.
 
 If you delete `poses.json` and find the camera positions again, the positions can change
 slightly, so check your edits afterwards.

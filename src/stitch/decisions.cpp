@@ -16,14 +16,16 @@ constexpr int kFormatVersion = 1;
 constexpr qint64 kMaxFileBytes = qint64{64} * 1024 * 1024;
 constexpr int kJpegQuality = 95;
 constexpr qsizetype kMinOutlinePoints = 3;
+constexpr qsizetype kMinLinePoints = 2;  // A line, which can only hold a description.
 
 [[nodiscard]] std::optional<core::Patch> readPatch(const QJsonObject& object) {
     const QString photo = object.value(QStringLiteral("photo")).toString();
     const QString note = object.value(QStringLiteral("note")).toString();
     const QJsonArray outline = object.value(QStringLiteral("outline")).toArray();
     // Only a file name is accepted, so that a damaged file can't point outside the folder.
+    const qsizetype minPoints = photo.isEmpty() ? kMinLinePoints : kMinOutlinePoints;
     if ((photo.isEmpty() && note.isEmpty()) || photo.contains(u'/') || photo.contains(u'\\') ||
-        outline.size() < kMinOutlinePoints) {
+        outline.size() < minPoints) {
         return std::nullopt;
     }
     core::Patch patch;

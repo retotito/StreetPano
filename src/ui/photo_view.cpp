@@ -101,7 +101,7 @@ void PhotoView::paintEvent(QPaintEvent* /*event*/) {
         const bool selected = static_cast<int>(index) == selectedOutline_;
         drawOutline(outlines_[index], selected ? QColor(255, 196, 0) : QColor(90, 200, 250), true);
     }
-    drawOutline(lasso_, QColor(255, 196, 0), false);
+    drawOutline(lasso_, QColor(255, 196, 0), markShape_ == MarkShape::Rectangle);
 }
 
 void PhotoView::resizeEvent(QResizeEvent* /*event*/) {
@@ -170,7 +170,8 @@ void PhotoView::mousePressEvent(QMouseEvent* event) {
     pressPoint_ = event->position();
     moved_ = false;
     if (lassoMode_ && event->button() == Qt::LeftButton && !image_.isNull()) {
-        lasso_ = QPolygonF{toImage(event->position())};
+        lassoStart_ = toImage(event->position());
+        lasso_ = QPolygonF{lassoStart_};
         update();
     }
 }
@@ -182,7 +183,19 @@ void PhotoView::mouseMoveEvent(QMouseEvent* event) {
     }
     if (lassoMode_ && (event->buttons() & Qt::LeftButton) != 0U) {
         if (!lasso_.isEmpty()) {
-            lasso_.append(toImage(event->position()));
+            const QPointF point = toImage(event->position());
+            switch (markShape_) {
+                case MarkShape::Freehand:
+                    lasso_.append(point);
+                    break;
+                case MarkShape::Rectangle:
+                    lasso_ = QPolygonF{lassoStart_, QPointF(point.x(), lassoStart_.y()), point,
+                                       QPointF(lassoStart_.x(), point.y())};
+                    break;
+                case MarkShape::Line:
+                    lasso_ = QPolygonF{lassoStart_, point};
+                    break;
+            }
             update();
         }
         return;
@@ -207,7 +220,10 @@ void PhotoView::mouseReleaseEvent(QMouseEvent* event) {
         const QPolygonF finished = lasso_;
         lasso_.clear();
         update();
-        if (finished.size() >= kMinLassoPoints) {
+        // A rectangle or line needs a real drag. A freehand outline needs enough points.
+        const bool usable = markShape_ == MarkShape::Freehand ? finished.size() >= kMinLassoPoints
+                                                              : moved_ && finished.size() >= 2;
+        if (usable) {
             emit lassoFinished(finished);
         }
         return;

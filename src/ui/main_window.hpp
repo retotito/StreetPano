@@ -71,6 +71,8 @@ class MainWindow : public QMainWindow {
     void setOutlinesShown(bool shown);
     [[nodiscard]] QListWidget* editsList() const { return editsList_; }
     [[nodiscard]] QAction* showOutlinesAction() const { return showOutlinesAction_; }
+    // Chooses what a drag draws, and turns marking on.
+    void setMarkShape(PhotoView::MarkShape shape);
     [[nodiscard]] QMenu* areaMenu() const { return areaMenu_; }
     [[nodiscard]] QString selectedAreaNote() const;
     [[nodiscard]] QString editMessage() const { return editMessage_; }
@@ -123,6 +125,8 @@ class MainWindow : public QMainWindow {
     void refreshEditsList();
     void onEditsRowMoved(int from, int to);
     [[nodiscard]] QString describeArea(const core::Patch& patch) const;
+    [[nodiscard]] bool isTargetALine() const;
+    [[nodiscard]] bool hits(const QPolygonF& outline, QPointF point) const;
     [[nodiscard]] std::vector<std::size_t> photoChoices(const core::Patch& patch) const;
     [[nodiscard]] QString findPosesFile() const;
 
@@ -151,6 +155,9 @@ class MainWindow : public QMainWindow {
     QMenu* areaMenu_ = nullptr;
     QListWidget* editsList_ = nullptr;
     QAction* showOutlinesAction_ = nullptr;
+    QAction* freehandAction_ = nullptr;
+    QAction* rectangleAction_ = nullptr;
+    QAction* lineAction_ = nullptr;
     bool refreshingList_ = false;
     QAction* removeObjectAction_ = nullptr;
     QAction* keepObjectAction_ = nullptr;
