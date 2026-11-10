@@ -653,16 +653,17 @@ bool MainWindow::openProject(const QString& projectFile) {
         refreshRecentProjects();
         return false;
     }
-    if (!openFolder(result.project->photoFolder)) {
-        projectsMessage_->setText(tr("The photos for %1 aren't in %2 any more.")
-                                      .arg(result.project->name, result.project->photoFolder));
+    const stitch::Project& opened = *result.project;
+    if (!openFolder(opened.photoFolder)) {
+        projectsMessage_->setText(
+            tr("The photos for %1 aren't in %2 any more.").arg(opened.name, opened.photoFolder));
         return false;
     }
-    project_ = result.project;
+    project_ = opened;
     projectsMessage_->clear();
-    RecentProjects::add(result.project->projectFile());
+    RecentProjects::add(opened.projectFile());
     refreshRecentProjects();
-    setWindowTitle(QStringLiteral("%1 - StreetPano").arg(project_->name));
+    setWindowTitle(QStringLiteral("%1 - StreetPano").arg(opened.name));
     return true;
 }
 
