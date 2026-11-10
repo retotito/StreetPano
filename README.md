@@ -6,11 +6,12 @@
 Open-source software for building very long street panoramas from photos taken
 while walking along a street.
 
-> **Status: early development.** The app builds a first panorama, but with simple straight
-> seams, so foreground objects are cut and squeezed. It has only been tested on synthetic
-> streets so far.
+> **Status: early development.** On a real street of 27 phone photos, the app builds a
+> straight panorama in which seams go around most objects. You can mark an area and remove or
+> keep what's in it. Lens correction, RAW photos and AI tools aren't built yet. All commands
+> are on one page: [Commands](docs/commands.md).
 
-![Seams chosen by graph cut keep a car whole, while straight seams break it](docs/assets/seams.svg)
+![Seams that follow agreement keep a car whole, while straight seams break it](docs/assets/seams.svg)
 
 ## The problem
 
