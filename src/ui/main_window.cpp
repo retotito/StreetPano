@@ -9,16 +9,21 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFont>
+#include <QHBoxLayout>
 #include <QInputDialog>
 #include <QItemSelectionModel>
 #include <QKeySequence>
+#include <QLineEdit>
 #include <QListWidgetItem>
 #include <QMenuBar>
+#include <QPushButton>
 #include <QShortcut>
 #include <QSplitter>
 #include <QStatusBar>
 #include <QTimer>
 #include <QToolBar>
+#include <QVBoxLayout>
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -31,6 +36,7 @@
 #include "core/photo_listing.hpp"
 #include "ui/film_strip_delegate.hpp"
 #include "ui/qt_ownership.hpp"
+#include "ui/recent_projects.hpp"
 
 namespace streetpano::ui {
 namespace {
@@ -77,12 +83,54 @@ MainWindow::MainWindow(std::size_t previewBudgetBytes, QWidget* parent)
     splitter->addWidget(strip_);
     splitter->setStretchFactor(0, 1);
     splitter->setStretchFactor(1, 0);
-    setCentralWidget(splitter);
+    workPage_ = splitter;
+
+    pages_ = makeChild<QStackedWidget>(this);
+    projectsPage_ = createProjectsPage();
+    alignPage_ = makeChild<QLabel>(
+        pages_, tr("Align\n\nAll photos side by side, with guide lines to straighten them.\n"
+                   "Coming next."));
+    static_cast<QLabel*>(alignPage_)->setAlignment(Qt::AlignCenter);
+    exportPage_ = createExportPage();
+    pages_->addWidget(projectsPage_);
+    pages_->addWidget(workPage_);
+    pages_->addWidget(alignPage_);
+    pages_->addWidget(exportPage_);
+    setCentralWidget(pages_);
+
+    // The steps, along the top. Each one can be revisited at any time.
+    QToolBar* steps = addToolBar(tr("Steps"));
+    steps->setObjectName(QStringLiteral("steps"));
+    steps->setMovable(false);
+    steps->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    auto* stepGroup = makeChild<QActionGroup>(this);
+    const auto addStep = [this, steps, stepGroup](const QString& name, const QString& tip,
+                                                  Step step) {
+        QAction* action = steps->addAction(name);
+        action->setCheckable(true);
+        action->setToolTip(tip);
+        stepGroup->addAction(action);
+        connect(action, &QAction::triggered, this, [this, step] { setStep(step); });
+        stepActions_.push_back(action);
+    };
+    addStep(tr("Projects"), tr("Create, open and switch between streets"), Step::Projects);
+    steps->addSeparator();
+    addStep(tr("\u2460 Photos"), tr("Check the photos, and stitch them"), Step::Photos);
+    addStep(tr("\u2461 Align"), tr("Straighten the photos with guide lines (coming next)"),
+            Step::Align);
+    addStep(tr("\u2462 Edit"), tr("Remove, keep and describe objects on the panorama"), Step::Edit);
+    addStep(tr("\u2463 Export"), tr("Save the finished panorama"), Step::Export);
+    addToolBarBreak();
 
     statusBar()->addWidget(positionLabel_);
     statusBar()->addPermanentWidget(memoryLabel_);
 
     auto* fileMenu = menuBar()->addMenu(tr("&File"));
+    QAction* newProjectAction = fileMenu->addAction(tr("&New Project…"));
+    newProjectAction->setShortcut(QKeySequence::New);
+    connect(newProjectAction, &QAction::triggered, this, &MainWindow::chooseNewProject);
+    QAction* openProjectAction = fileMenu->addAction(tr("Open &Project…"));
+    connect(openProjectAction, &QAction::triggered, this, &MainWindow::chooseProject);
     QAction* openAction = fileMenu->addAction(tr("&Open Folder…"));
     openAction->setShortcut(QKeySequence::Open);
     connect(openAction, &QAction::triggered, this, &MainWindow::chooseFolder);
@@ -98,6 +146,12 @@ MainWindow::MainWindow(std::size_t previewBudgetBytes, QWidget* parent)
     QAction* stitchAction = stitchMenu->addAction(tr("&Quick Stitch…"));
     stitchAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
     connect(stitchAction, &QAction::triggered, this, &MainWindow::chooseStitch);
+    stitchAction->setIconText(tr("Stitch Panorama"));
+    photosTools_ = addToolBar(tr("Photos"));
+    photosTools_->setObjectName(QStringLiteral("photos"));
+    photosTools_->setMovable(false);
+    photosTools_->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    photosTools_->addAction(stitchAction);
     showPanoramaAction_ = stitchMenu->addAction(tr("Show &Panorama"));
     showPanoramaAction_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_P));
     showPanoramaAction_->setEnabled(false);
@@ -170,6 +224,8 @@ MainWindow::MainWindow(std::size_t previewBudgetBytes, QWidget* parent)
     areaMenu_->addAction(deleteAreaAction_);
 
     QToolBar* tools = addToolBar(tr("Edit"));
+    tools->setObjectName(QStringLiteral("edit"));
+    editTools_ = tools;
     tools->setMovable(false);
     tools->setToolButtonStyle(Qt::ToolButtonTextOnly);
     tools->addAction(markAreaAction_);
@@ -216,6 +272,7 @@ MainWindow::MainWindow(std::size_t previewBudgetBytes, QWidget* parent)
 
     // The edits panel, on the right.
     auto* dock = makeChild<QDockWidget>(this, tr("Edits"));
+    editsDock_ = dock;
     dock->setObjectName(QStringLiteral("edits"));
     dock->setFeatures(QDockWidget::DockWidgetMovable);
     editsList_ = makeChild<QListWidget>(dock);
@@ -267,6 +324,8 @@ MainWindow::MainWindow(std::size_t previewBudgetBytes, QWidget* parent)
     connect(previous, &QShortcut::activated, this, [this] { selectPhoto(currentRow_ - 1); });
 
     view_->setMessage(tr("Open a folder of street photos to begin.\nFile > Open Folder"));
+    refreshRecentProjects();
+    applyStep(Step::Projects);
     updateStatus();
 }
 
@@ -412,14 +471,248 @@ void MainWindow::onStitchFinished() {
     updateStatus();
 }
 
-void MainWindow::showPanorama() {
+void MainWindow::showPanorama() { setStep(Step::Edit); }
+
+void MainWindow::displayPanorama() {
     if (!panorama_.isNull()) {
         showingPanorama_ = true;
+        applyStep(Step::Edit);
         view_->fitToWindow();
         view_->setImage(panorama_);
         redrawPanorama();
         updateEditActions();
     }
+}
+
+QAction* MainWindow::stepAction(Step step) const {
+    return stepActions_[static_cast<std::size_t>(step)];
+}
+
+bool MainWindow::isStepAvailable(Step step) const {
+    switch (step) {
+        case Step::Projects:
+            return true;
+        case Step::Photos:
+        case Step::Align:
+            return photoCount() > 0;
+        case Step::Edit:
+        case Step::Export:
+            return !panorama_.isNull();
+    }
+    return false;
+}
+
+void MainWindow::updateStepActions() {
+    for (std::size_t index = 0; index < stepActions_.size(); ++index) {
+        stepActions_[index]->setEnabled(isStepAvailable(static_cast<Step>(index)));
+        stepActions_[index]->setChecked(static_cast<Step>(index) == step_);
+    }
+}
+
+void MainWindow::applyStep(Step step) {
+    step_ = step;
+    switch (step) {
+        case Step::Projects:
+            pages_->setCurrentWidget(projectsPage_);
+            break;
+        case Step::Photos:
+        case Step::Edit:
+            pages_->setCurrentWidget(workPage_);
+            break;
+        case Step::Align:
+            pages_->setCurrentWidget(alignPage_);
+            break;
+        case Step::Export:
+            pages_->setCurrentWidget(exportPage_);
+            break;
+    }
+    // Each step shows only its own tools.
+    strip_->setVisible(step == Step::Photos);
+    photosTools_->setVisible(step == Step::Photos);
+    editTools_->setVisible(step == Step::Edit);
+    editsDock_->setVisible(step == Step::Edit);
+    if (step != Step::Edit && markAreaAction_->isChecked()) {
+        markAreaAction_->setChecked(false);
+    }
+    if (step == Step::Export) {
+        exportInfo_->setText(tr("Panorama: %1 x %2 px, with %n edit(s).\nIt will be saved to %3",
+                                nullptr, areaCount())
+                                 .arg(panorama_.width())
+                                 .arg(panorama_.height())
+                                 .arg(panoramaPath_));
+    }
+    updateStepActions();
+}
+
+void MainWindow::setStep(Step step) {
+    if (!isStepAvailable(step)) {
+        updateStepActions();
+        return;
+    }
+    if (step == Step::Edit) {
+        displayPanorama();
+    } else if (step == Step::Photos) {
+        showPhoto(currentRow_ >= 0 ? currentRow_ : 0);
+    } else {
+        applyStep(step);
+    }
+}
+
+QWidget* MainWindow::createProjectsPage() {
+    auto* page = makeChild<QWidget>(this);
+    auto* layout = makeChild<QVBoxLayout>(page);
+    auto* title = makeChild<QLabel>(page, tr("Projects"));
+    QFont font = title->font();
+    font.setPointSizeF(font.pointSizeF() * 1.6);
+    font.setBold(true);
+    title->setFont(font);
+    layout->addWidget(title);
+    layout->addWidget(makeChild<QLabel>(
+        page, tr("Each street is a project. Photos stay where they are and are never copied. "
+                 "The project's own files go in a folder beside them.")));
+    auto* row = makeChild<QWidget>(page);
+    auto* buttons = makeChild<QHBoxLayout>(row);
+    buttons->setContentsMargins(0, 0, 0, 0);
+    auto* newButton = makeChild<QPushButton>(page, tr("New Project…"));
+    auto* openButton = makeChild<QPushButton>(page, tr("Open Project…"));
+    connect(newButton, &QPushButton::clicked, this, &MainWindow::chooseNewProject);
+    connect(openButton, &QPushButton::clicked, this, &MainWindow::chooseProject);
+    buttons->addWidget(newButton);
+    buttons->addWidget(openButton);
+    buttons->addStretch();
+    layout->addWidget(row);
+    layout->addWidget(makeChild<QLabel>(page, tr("Recent projects")));
+    recentList_ = makeChild<QListWidget>(page);
+    connect(recentList_, &QListWidget::itemActivated, this,
+            [this](QListWidgetItem* item) { openProject(item->data(Qt::UserRole).toString()); });
+    layout->addWidget(recentList_, 1);
+    projectsMessage_ = makeChild<QLabel>(page);
+    projectsMessage_->setWordWrap(true);
+    layout->addWidget(projectsMessage_);
+    return page;
+}
+
+QWidget* MainWindow::createExportPage() {
+    auto* page = makeChild<QWidget>(this);
+    auto* layout = makeChild<QVBoxLayout>(page);
+    auto* title = makeChild<QLabel>(page, tr("Export"));
+    QFont font = title->font();
+    font.setPointSizeF(font.pointSizeF() * 1.6);
+    font.setBold(true);
+    title->setFont(font);
+    layout->addWidget(title);
+    exportInfo_ = makeChild<QLabel>(page);
+    exportInfo_->setWordWrap(true);
+    layout->addWidget(exportInfo_);
+    auto* row = makeChild<QWidget>(page);
+    auto* buttons = makeChild<QHBoxLayout>(row);
+    buttons->setContentsMargins(0, 0, 0, 0);
+    auto* save = makeChild<QPushButton>(page, tr("Save Panorama"));
+    auto* saveAs = makeChild<QPushButton>(page, tr("Save As…"));
+    connect(save, &QPushButton::clicked, this, [this] { savePanoramaFile(); });
+    connect(saveAs, &QPushButton::clicked, this, &MainWindow::chooseSaveAs);
+    buttons->addWidget(save);
+    buttons->addWidget(saveAs);
+    buttons->addStretch();
+    layout->addWidget(row);
+    layout->addStretch();
+    return page;
+}
+
+void MainWindow::refreshRecentProjects() {
+    recentList_->clear();
+    for (const QString& file : RecentProjects::load()) {
+        const stitch::ProjectResult result = stitch::readProject(file);
+        if (result.project.has_value()) {
+            auto* item = makeChild<QListWidgetItem>(
+                recentList_, QStringLiteral("%1   \u00b7   %2")
+                                 .arg(result.project->name, result.project->photoFolder));
+            item->setData(Qt::UserRole, file);
+        }
+    }
+}
+
+bool MainWindow::openProjectForFolder(const QString& photoFolder) {
+    return createProject({}, photoFolder);
+}
+
+bool MainWindow::createProject(const QString& name, const QString& photoFolder) {
+    const stitch::ProjectResult result = stitch::openOrCreateProject(photoFolder, name);
+    if (!result.project.has_value()) {
+        projectsMessage_->setText(result.error);
+        return false;
+    }
+    return openProject(result.project->projectFile());
+}
+
+bool MainWindow::openProject(const QString& projectFile) {
+    const stitch::ProjectResult result = stitch::readProject(projectFile);
+    if (!result.project.has_value()) {
+        projectsMessage_->setText(result.error);
+        RecentProjects::remove(projectFile);
+        refreshRecentProjects();
+        return false;
+    }
+    const stitch::Project& opened = *result.project;
+    if (!openFolder(opened.photoFolder)) {
+        projectsMessage_->setText(
+            tr("The photos for %1 aren't in %2 any more.").arg(opened.name, opened.photoFolder));
+        return false;
+    }
+    project_ = opened;
+    projectsMessage_->clear();
+    RecentProjects::add(opened.projectFile());
+    refreshRecentProjects();
+    setWindowTitle(QStringLiteral("%1 - StreetPano").arg(opened.name));
+    return true;
+}
+
+void MainWindow::chooseNewProject() {
+    bool accepted = false;
+    const QString name = QInputDialog::getText(this, tr("New Project"), tr("Name of the street:"),
+                                               QLineEdit::Normal, {}, &accepted);
+    if (!accepted) {
+        return;
+    }
+    const QString folder = QFileDialog::getExistingDirectory(
+        this, tr("Choose the folder with your photos. They stay where they are."));
+    if (!folder.isEmpty()) {
+        createProject(name, folder);
+    }
+}
+
+void MainWindow::chooseProject() {
+    const QString folder = QFileDialog::getExistingDirectory(
+        this, tr("Choose a folder of photos, or its .streetpano folder"));
+    if (folder.isEmpty()) {
+        return;
+    }
+    const QString projectFile = QDir(folder).filePath(QStringLiteral("project.json"));
+    if (QFile::exists(projectFile)) {
+        openProject(projectFile);
+    } else {
+        openProjectForFolder(folder);
+    }
+}
+
+void MainWindow::chooseSaveAs() {
+    const QString path = QFileDialog::getSaveFileName(this, tr("Save Panorama As"), panoramaPath_,
+                                                      tr("Images (*.jpg *.png *.tif)"));
+    if (!path.isEmpty()) {
+        savePanoramaAs(path);
+    }
+}
+
+bool MainWindow::savePanoramaAs(const QString& path) {
+    if (panorama_.isNull()) {
+        return false;
+    }
+    const bool saved = stitch::savePanorama(panorama_, path);
+    editMessage_ =
+        saved ? tr("Saved %1").arg(path) : tr("The panorama couldn't be saved to %1.").arg(path);
+    exportInfo_->setText(exportInfo_->text().section(u'\n', 0, 0) + u'\n' + editMessage_);
+    updateStatus();
+    return saved;
 }
 
 namespace {
@@ -938,6 +1231,7 @@ QString MainWindow::selectedAreaPhoto() const {
 }
 
 void MainWindow::updateEditActions() {
+    updateStepActions();
     const bool canEdit = showingPanorama_ && !panorama_.isNull();
     markAreaAction_->setEnabled(canEdit);
     if (!canEdit && markAreaAction_->isChecked()) {
@@ -971,6 +1265,7 @@ void MainWindow::showPhoto(int row) {
     }
     currentRow_ = row;
     showingPanorama_ = false;
+    applyStep(Step::Photos);
     pendingArea_.clear();
     selectedArea_ = -1;
     view_->setOutlines({}, -1);
@@ -1010,7 +1305,9 @@ void MainWindow::onPreviewFailed(int row, const QString& message) {
 }
 
 void MainWindow::updateStatus() {
-    if (currentRow_ >= 0) {
+    if (showingPanorama_) {
+        positionLabel_->setText(project_.has_value() ? project_->name : tr("Panorama"));
+    } else if (currentRow_ >= 0) {
         positionLabel_->setText(
             tr("Photo %1 of %2: %3")
                 .arg(currentRow_ + 1)

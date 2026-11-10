@@ -26,7 +26,8 @@ int main(int argc, char* argv[]) {
     window.show();
     const QStringList arguments = parser.positionalArguments();
     if (!arguments.isEmpty()) {
-        if (window.openFolder(arguments.first()) && parser.isSet(stitchOption)) {
+        // Opening a folder makes it a project, so that it appears in the projects list.
+        if (window.openProjectForFolder(arguments.first()) && parser.isSet(stitchOption)) {
             window.startStitchFromFolder();
         }
     }
