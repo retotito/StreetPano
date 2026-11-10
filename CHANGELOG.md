@@ -13,6 +13,8 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Marking stays on until Esc, so several objects can be outlined in a row, and on a trackpad
+  two fingers move the view and pinching zooms
 - An edits panel that lists every edit, can switch one off and changes their order, and
   outlines that disappear once an edit is finished
 - Mark an area on the panorama, then remove or keep what's in it from a menu, with undo and

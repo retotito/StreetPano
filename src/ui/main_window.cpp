@@ -138,6 +138,19 @@ MainWindow::MainWindow(std::size_t previewBudgetBytes, QWidget* parent)
         showAreaMenu(QCursor::pos());
     });
     connect(view_, &PhotoView::imageClicked, this, &MainWindow::selectAreaAt);
+    connect(markAreaAction_, &QAction::toggled, this, [this](bool marking) {
+        editMessage_ =
+            marking ? tr("Marking is on: drag around each object. Press Esc to stop.") : QString{};
+        updateStatus();
+    });
+    auto* stopMarking = makeChild<QShortcut>(this, QKeySequence(Qt::Key_Escape));
+    connect(stopMarking, &QShortcut::activated, this, [this] {
+        if (markAreaAction_->isChecked()) {
+            markAreaAction_->setChecked(false);
+        } else if (hasPendingArea()) {
+            cancelOrDeleteArea();
+        }
+    });
     connect(view_, &PhotoView::imageRightClicked, this, &MainWindow::onAreaRightClicked);
 
     areaMenu_ = makeChild<QMenu>(this);
@@ -555,7 +568,6 @@ void MainWindow::beginArea(const QPolygonF& outline) {
     }
     pendingArea_ = outline;
     selectedArea_ = -1;
-    markAreaAction_->setChecked(false);
     editMessage_ = tr("Choose what to do with this area.");
     redrawPanorama();
     updateEditActions();
